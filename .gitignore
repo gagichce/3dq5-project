@@ -17,9 +17,13 @@
 *.smsg
 *.bak
 *~
+
+*modelsim.ini
+
 db/
 incremental_db/
 simulation/
+rtl_work/
 
 # => excludes *.sof from ignoring.
 #!*.sof
