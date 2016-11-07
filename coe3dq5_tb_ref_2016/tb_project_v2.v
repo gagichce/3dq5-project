@@ -104,8 +104,8 @@ project uut (
 		.SWITCH_I(Switches),
 		.PUSH_BUTTON_I(Push_buttons),		
 
-		.SEVEN_SEGMENT_N_O(seven_segment_n),
-		.LED_GREEN_O(LED_Green),
+		//.SEVEN_SEGMENT_N_O(seven_segment_n),
+		//.LED_GREEN_O(LED_Green),
 
 		.VGA_CLOCK_O(VGA_clock),
 		.VGA_HSYNC_O(VGA_Hsync),
@@ -122,10 +122,10 @@ project uut (
 		.SRAM_LB_N_O(SRAM_LB_N),
 		.SRAM_WE_N_O(SRAM_WE_N),
 		.SRAM_CE_N_O(SRAM_CE_N),
-		.SRAM_OE_N_O(SRAM_OE_N),
+		.SRAM_OE_N_O(SRAM_OE_N)
 		
-		.UART_RX_I(1'b1),
-		.UART_TX_O()
+		//.UART_RX_I(1'b1),
+		//.UART_TX_O()
 );
 
 // The emulator for the external SRAM during simulation
@@ -230,8 +230,8 @@ begin
 
 	// Write RGB main data
 	for (i = 0; i < 3*320*240/2; i = i + 1) begin
-		high_byte = (SRAM_component.SRAM_data[i+uut.VGA_base_address] >> 8) & 8'hFF;
-		low_byte = SRAM_component.SRAM_data[i+uut.VGA_base_address] & 8'hFF;
+		//high_byte = (SRAM_component.SRAM_data[i+uut.VGA_unit.VGA_base_address] >> 8) & 8'hFF;
+		//low_byte = SRAM_component.SRAM_data[i+uut.VGA_unit.VGA_base_address] & 8'hFF;
 
 		// $fwrite can't support the 8'h00 = "\0" character, so offset it to 
 		// 8'h01. The output image will not be numerically identical, but it 
@@ -279,12 +279,12 @@ initial begin
 	//should move out of receiving uart data to decoding the data
 	//in hardware, we would have to wait 1 second, but in simulation 50 million clocks is kind of slow
 	//so just force the timer to a value that is nearly that of the "time-out"
-	uut.UART_timer = 26'd49999990;
-	wait (uut.top_state != 0);	//this assumes S_IDLE is the first in the list where the states are enumerated
+	//uut.UART_timer = 26'd49999990;
+	wait (uut.state != 0);	//this assumes S_IDLE is the first in the list where the states are enumerated
 	$write("Starting Decoder at %t\n\n", $realtime);
 	
-	wait (uut.top_state == 0);	//this assumes we go back to S_IDLE when we are done
-//	wait (uut.done == 1);		//otherwise change as needed, could use a done signal
+	wait (uut.state == 0);	//this assumes we go back to S_IDLE when we are done
+	wait (uut.done == 1);		//otherwise change as needed, could use a done signal
 
 	@ (posedge Clock_50);		//let sram writes finish, not sure if this is really needed...
 	@ (posedge Clock_50);

@@ -92,7 +92,7 @@ project uut (
 		.SWITCH_I(Switches),
 		.PUSH_BUTTON_I(Push_buttons),		
 
-		.SEVEN_SEGMENT_N_O(seven_segment_n),
+		//.SEVEN_SEGMENT_N_O(seven_segment_n),
 		.LED_GREEN_O(LED_Green),
 
 		.VGA_CLOCK_O(VGA_clock),
