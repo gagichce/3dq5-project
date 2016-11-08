@@ -269,7 +269,6 @@ initial begin
 	@ (posedge Clock_50);
 	SRAM_resetn = 1'b1;
 	
-	@ (posedge Clock_50);
 	@ (posedge Clock_50);	
 
 	init_sram;
@@ -281,6 +280,9 @@ initial begin
 	//so just force the timer to a value that is nearly that of the "time-out"
 	//uut.UART_timer = 26'd49999990;
 	wait (uut.state != 0);	//this assumes S_IDLE is the first in the list where the states are enumerated
+	@ (posedge Clock_50);
+	// @ (posedge Clock_50);
+	
 	$write("Starting Decoder at %t\n\n", $realtime);
 	
 	wait (uut.state == 0);	//this assumes we go back to S_IDLE when we are done
@@ -289,7 +291,7 @@ initial begin
 	@ (posedge Clock_50);		//let sram writes finish, not sure if this is really needed...
 	@ (posedge Clock_50);
 	@ (posedge Clock_50);
-	
+		$stop;
 	check_sram_write_counts;	//this task checks that we've written to all the locations that we were supposed to
 	
 	write_PPM_file;

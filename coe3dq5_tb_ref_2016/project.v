@@ -52,6 +52,8 @@ parameter NUM_ROW_RECTANGLE = 8,
 		  VIEW_AREA_TOP = 120,
 		  VIEW_AREA_BOTTOM = 360;
 
+parameter Y_OFFSET = 0, U_OFFSET = 18'd38400, V_OFFSET = 18'd57600, RGB_OFFSET = 18'd146944;
+
 // Define the offset for Green and Blue data in the memory		
 parameter RED_OFFSET = 18'd146944,
 	  GREEN_EVEN_OFFSET = 18'd185344,
@@ -63,6 +65,13 @@ parameter RED_OFFSET = 18'd146944,
 logic [17:0] data_counter;
 state_top state;
 logic done;
+
+//keep track of whether or not we are working on an even collumn.
+logic even_counter;
+
+assign even_counter = ~data_counter[0];
+
+logic [2:0] S_IDLE_WAIT;
 // For Push button
 logic [3:0] PB_pushed;
 
@@ -79,6 +88,14 @@ logic [15:0] SRAM_write_data;
 logic SRAM_we_n;
 logic [15:0] SRAM_read_data;
 logic SRAM_ready;
+
+// For Colorspace conversion
+logic [7:0] RED, GREEN, BLUE, Y, U, V, Y_multi, U_multi, V_multi;
+
+assign Y_multi = Y - 16;
+assign U_multi = U - 128;
+assign V_multi = V - 128;
+
 
 logic [2:0] rect_row_count;	// Number of rectangles in a row
 logic [2:0] rect_col_count;	// Number of rectangles in a column
@@ -144,12 +161,15 @@ VGA_Controller VGA_unit(
 	.oVGA_CLOCK(VGA_CLOCK_O)
 );
 
+
+
 // Each rectangle will have different color
 assign color = rect_col_count + rect_row_count;
 
 always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 	if (resetn == 1'b0) begin
-		state <= S_IDLE;
+		state <= S_IDLE_TOP;
+		S_IDLE_WAIT <= 2'b00;
 		rect_row_count <= 3'd0;
 		rect_col_count <= 3'd0;
 		rect_width_count <= 6'd0;
@@ -167,19 +187,36 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		RED_second_word <= 1'b0;
 	end else begin
 		case (state)
-		S_IDLE: begin
-			state <= S_COLOR_CONVERSION_DELAY_0;
+		S_IDLE_TOP: begin
+			S_IDLE_WAIT <= S_IDLE_WAIT + 1'b1;
+			if (S_IDLE_WAIT == 2'b1) begin
+				S_IDLE_WAIT <= 1'b0;
+				state <= S_READ_Y;
+				SRAM_address <= data_counter + Y_OFFSET;
+			end
+			done <= 1'b1;
 		end
 
-		S_COLOR_CONVERSION_DELAY_0: begin
-			state <= S_COLOR_CONVERSION_DELAY_1;
+		S_READ_Y: begin
+			state <= S_READ_U;
+			SRAM_address <= data_counter + U_OFFSET; 
 		end
 
-		S_COLOR_CONVERSION_DELAY_1: begin
-			state <=S_COLOR_CONVERSION;
+		S_READ_U: begin
+			state <= S_READ_V;
+			SRAM_address <= data_counter + V_OFFSET; 
+		end
+
+		S_READ_V: begin
+			SRAM_address <= data_counter + RGB_OFFSET;
+			if(SRAM_address > 100) begin 
+				state <= S_IDLE_TOP;
+			end
 		end
 		
-		default: state <= S_IDLE;
+
+
+		default: state <= S_IDLE_TOP;
 		endcase
 	end
 end
