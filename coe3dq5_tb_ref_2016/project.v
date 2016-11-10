@@ -61,6 +61,8 @@ parameter RED_OFFSET = 18'd146944,
 	  BLUE_EVEN_OFFSET = 18'd223744,
 	  BLUE_ODD_OFFSET = 18'd242944;
 
+parameter U_21_CONSTANT = 32'd21, U_52_CONSTANT = 32'd52, U_159_CONSTANT = 32'd159;
+
 // Data counter for getting RGB data of a pixel
 logic [17:0] data_counter;
 state_top state;
@@ -87,15 +89,40 @@ logic [17:0] SRAM_address;
 logic [15:0] SRAM_write_data;
 logic SRAM_we_n;
 logic [15:0] SRAM_read_data;
+logic [7:0] SRAM_read_high_byte, SRAM_read_low_byte;
 logic SRAM_ready;
 
+assign SRAM_read_high_byte = SRAM_read_data[15:8];
+assign SRAM_read_low_byte = SRAM_read_data[7:0];
+
 // For Colorspace conversion
-logic [7:0] RED, GREEN, BLUE, Y, U, V, Y_multi, U_multi, V_multi;
+logic [7:0] RED, GREEN, BLUE, Y_ODD, Y_EVEN, U_ODD, U_EVEN, V_ODD, V_EVEN, Y_multi_EVEN, U_multi_EVEN, V_multi_EVEN, Y_multi_ODD, U_multi_ODD, V_multi_ODD;
 
-assign Y_multi = Y - 16;
-assign U_multi = U - 128;
-assign V_multi = V - 128;
 
+logic [31:0] U_21, U_52, U_159, V_21, V_52, V_159;
+
+logic [8:0] U_N [7:0];
+logic [8:0] V_N [7:0];
+
+assign U_21 = U_N[5] + U_N[0];
+assign U_52 = U_N[4] + U_N[1];
+assign U_159 = U_N[3] + U_N[2];
+
+assign V_21 = V_N[5] + V_N[0];
+assign V_52 = V_N[4] + V_N[1];
+assign V_159 = V_N[3] + V_N[2];
+
+assign Y_multi_EVEN = Y_EVEN - 16;
+assign U_multi_EVEN = U_EVEN - 128;
+assign V_multi_EVEN = V_EVEN - 128;
+
+assign Y_multi_ODD = Y_ODD - 16;
+assign U_multi_ODD = U_ODD - 128;
+assign V_multi_ODD = V_ODD - 128;
+
+logic [31:0] mul0_op1, mul0_op2, mul0_result;
+logic [31:0] mul1_op1, mul1_op2, mul1_result;
+logic [31:0] mul2_op1, mul2_op2, mul2_result;
 
 logic [2:0] rect_row_count;	// Number of rectangles in a row
 logic [2:0] rect_col_count;	// Number of rectangles in a column
@@ -161,6 +188,29 @@ VGA_Controller VGA_unit(
 	.oVGA_CLOCK(VGA_CLOCK_O)
 );
 
+milestone1_multiplier mul0 (
+	.Resetn(resetn),
+	.value00(mul0_op1),
+	.value01(mul0_op2),
+	.select(1'b0),
+	.result(mul0_result)
+);
+
+milestone1_multiplier mul1 (
+	.Resetn(resetn),
+	.value00(mul1_op1),
+	.value01(mul1_op2),
+	.select(1'b0),
+	.result(mul1_result)
+);
+
+milestone1_multiplier mul2 (
+	.Resetn(resetn),
+	.value00(mul2_op1),
+	.value01(mul2_op2),
+	.select(1'b0),
+	.result(mul2_result)
+);
 
 
 // Each rectangle will have different color
@@ -185,36 +235,124 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		
 		data_counter <= 18'd0;
 		RED_second_word <= 1'b0;
+
+		Y_ODD <= 1'b0;
+		Y_EVEN <= 1'b0;
+		U_ODD <= 1'b0;
+		U_EVEN <= 1'b0;
+		V_ODD <= 1'b0;
+		V_EVEN <= 1'b0;
+
+		U_N[0] <= 1'b0;
+		U_N[1] <= 1'b0;
+		U_N[2] <= 1'b0;
+		U_N[3] <= 1'b0;
+		U_N[4] <= 1'b0;
+		U_N[5] <= 1'b0;
+		U_N[6] <= 1'b0;
+		U_N[7] <= 1'b0;
+
+		V_N[0] <= 1'b0;
+		V_N[1] <= 1'b0;
+		V_N[2] <= 1'b0;
+		V_N[3] <= 1'b0;
+		V_N[4] <= 1'b0;
+		V_N[5] <= 1'b0;
+		V_N[6] <= 1'b0;
+		V_N[7] <= 1'b0;
+
 	end else begin
 		case (state)
 		S_IDLE_TOP: begin
 			S_IDLE_WAIT <= S_IDLE_WAIT + 1'b1;
 			if (S_IDLE_WAIT == 2'b1) begin
 				S_IDLE_WAIT <= 1'b0;
-				state <= S_READ_Y;
-				SRAM_address <= data_counter + Y_OFFSET;
+				state <= S_READ_U_0;
+				SRAM_address <= data_counter + U_OFFSET;
 			end
 			done <= 1'b1;
 		end
 
-		S_READ_Y: begin
-			state <= S_READ_U;
-			SRAM_address <= data_counter + U_OFFSET; 
+		S_READ_U_0: begin
+			state <= S_READ_U_1;
+			SRAM_address <= data_counter + U_OFFSET + 1; 
 		end
 
-		S_READ_U: begin
-			state <= S_READ_V;
+		S_READ_U_1: begin
+			state <= S_READ_V_0;
 			SRAM_address <= data_counter + V_OFFSET; 
 		end
 
-		S_READ_V: begin
-			SRAM_address <= data_counter + RGB_OFFSET;
-			if(SRAM_address > 100) begin 
-				state <= S_IDLE_TOP;
-			end
+		S_READ_V_0: begin
+			SRAM_address <= data_counter + V_OFFSET + 1; 
+			U_EVEN <= SRAM_read_high_byte;
+			U_N[0] <= SRAM_read_high_byte;
+			U_N[1] <= SRAM_read_high_byte;
+			U_N[2] <= SRAM_read_high_byte;
+			U_N[3] <= SRAM_read_low_byte;
+			state <= S_READ_V_1;
+
 		end
 		
+		S_READ_V_1: begin
+			SRAM_address <= data_counter + Y_OFFSET;
+			U_N[4] <= SRAM_read_high_byte;
+			U_N[5] <= SRAM_read_low_byte;
+			state <= S_READ_Y;
+		end
 
+		S_READ_Y: begin
+			V_EVEN <= SRAM_read_high_byte;
+			V_N[0] <= SRAM_read_high_byte;
+			V_N[1] <= SRAM_read_high_byte;
+			V_N[2] <= SRAM_read_high_byte;
+			V_N[3] <= SRAM_read_low_byte;
+			state <= S_CALC_U;
+		end
+
+		S_CALC_U: begin
+			V_N[4] <= SRAM_read_high_byte;
+			V_N[5] <= SRAM_read_low_byte;
+
+			mul0_op1 <= U_21;
+			mul0_op2 <= U_21_CONSTANT;
+			mul1_op1 <= U_52;
+			mul1_op2 <= U_52_CONSTANT;
+			mul2_op1 <= U_159;
+			mul2_op2 <= U_159_CONSTANT;
+
+			state <= S_CALC_V;
+		end
+
+		S_CALC_V: begin
+
+			U_ODD <= mul0_result - mul1_result + mul2_result + 128;
+
+			mul0_op1 <= V_21;
+			mul0_op2 <= U_21_CONSTANT;
+			mul1_op1 <= V_52;
+			mul1_op2 <= U_52_CONSTANT;
+			mul2_op1 <= V_159;
+			mul2_op2 <= U_159_CONSTANT;
+
+			//load Y
+			Y_EVEN <= SRAM_read_high_byte;
+			Y_ODD <= SRAM_read_low_byte;
+			
+			state <= S_IDLE_TOP;
+		end
+
+		S_CALC_R00: begin
+			V_ODD <= mul0_result - mul1_result + mul2_result + 128;
+
+
+			state <= S_CALC_R01;
+		end
+
+		S_CALC_R01: begin
+			
+			state <= S_IDLE_TOP;
+		end
 
 		default: state <= S_IDLE_TOP;
 		endcase
