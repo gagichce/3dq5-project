@@ -62,6 +62,7 @@ parameter RED_OFFSET = 18'd146944,
 	  BLUE_ODD_OFFSET = 18'd242944;
 
 parameter U_21_CONSTANT = 32'd21, U_52_CONSTANT = 32'd52, U_159_CONSTANT = 32'd159;
+parameter R_76284_CONSTANT = 32'd76284, R_25624_CONSTANT = 32'd25624, R_132251_CONSTANT = 32'd132251, R_104595_CONSTANT = 32'd104595, R_53281_CONSTANT = 32'd53281;
 
 // Data counter for getting RGB data of a pixel
 logic [17:0] data_counter;
@@ -98,8 +99,13 @@ assign SRAM_read_low_byte = SRAM_read_data[7:0];
 // For Colorspace conversion
 logic [7:0] RED, GREEN, BLUE, Y_ODD, Y_EVEN, U_ODD, U_EVEN, V_ODD, V_EVEN, Y_multi_EVEN, U_multi_EVEN, V_multi_EVEN, Y_multi_ODD, U_multi_ODD, V_multi_ODD;
 
+//logic [32:0]  
 
 logic [31:0] U_21, U_52, U_159, V_21, V_52, V_159;
+
+logic [63:0] R_result_EVEN, G_result_EVEN, B_result_EVEN, R_result_ODD, G_result_ODD, B_result_ODD;
+
+logic [7:0] R_writable, G_writable, B_writable;
 
 logic [8:0] U_N [7:0];
 logic [8:0] V_N [7:0];
@@ -307,12 +313,16 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			V_N[1] <= SRAM_read_high_byte;
 			V_N[2] <= SRAM_read_high_byte;
 			V_N[3] <= SRAM_read_low_byte;
-			state <= S_CALC_U;
+			state <= S_START_ROW;
 		end
-
-		S_CALC_U: begin
+		S_START_ROW: begin
 			V_N[4] <= SRAM_read_high_byte;
 			V_N[5] <= SRAM_read_low_byte;
+			
+			state <= S_CALC_U;
+		end
+		S_CALC_U: begin
+
 
 			mul0_op1 <= U_21;
 			mul0_op2 <= U_21_CONSTANT;
@@ -339,17 +349,70 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			Y_EVEN <= SRAM_read_high_byte;
 			Y_ODD <= SRAM_read_low_byte;
 			
-			state <= S_IDLE_TOP;
+			state <= S_CALC_R00;
 		end
 
 		S_CALC_R00: begin
 			V_ODD <= mul0_result - mul1_result + mul2_result + 128;
 
+			mul0_op1 <= Y_multi_EVEN;
+			mul0_op2 <= R_76284_CONSTANT;
+
+			mul1_op1 <= U_multi_EVEN;
+			mul1_op2 <= R_25624_CONSTANT;
+
+			mul2_op1 <= V_multi_EVEN;
+			mul2_op2 <= R_104595_CONSTANT;
 
 			state <= S_CALC_R01;
 		end
 
 		S_CALC_R01: begin
+
+			R_result_EVEN <= mul0_result + mul2_result;
+			G_result_EVEN <= mul0_result - mul1_result;
+			B_result_EVEN <= mul0_result;
+
+			mul0_op1 <= 0;
+			mul0_op2 <= 0;
+
+			mul1_op2 <= R_132251_CONSTANT;
+
+			mul2_op2 <= R_53281_CONSTANT;
+			
+			state <= S_CALC_R10;
+		end
+
+
+		S_CALC_R10: begin
+
+			G_result_EVEN <= G_result_EVEN - mul2_result;
+			B_result_EVEN <= B_result_EVEN + mul1_result;
+
+			mul0_op1 <= Y_multi_ODD;
+			mul0_op2 <= R_76284_CONSTANT;
+
+			mul1_op1 <= U_multi_ODD;
+			mul1_op2 <= R_25624_CONSTANT;
+
+			mul2_op1 <= V_multi_ODD;
+			mul2_op2 <= R_104595_CONSTANT;
+			
+			state <= S_CALC_R11;
+		end
+
+		S_CALC_R11: begin
+
+			R_result_ODD <= mul0_result + mul2_result;
+			G_result_ODD <= mul0_result - mul1_result;
+			B_result_ODD <= mul0_result;
+
+			mul0_op1 <= 0;
+			mul0_op2 <= 0;
+
+			mul1_op2 <= R_132251_CONSTANT;
+
+			mul2_op2 <= R_53281_CONSTANT;
 			
 			state <= S_IDLE_TOP;
 		end
