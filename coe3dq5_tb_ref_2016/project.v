@@ -62,7 +62,7 @@ parameter RED_OFFSET = 18'd146944,
 	  BLUE_ODD_OFFSET = 18'd242944;
 
 parameter U_21_CONSTANT = 32'd21, U_52_CONSTANT = 32'd52, U_159_CONSTANT = 32'd159;
-parameter R_76284_CONSTANT = 32'd76284, R_25624_CONSTANT = 32'd25624, R_132251_CONSTANT = 32'd132251, R_104595_CONSTANT = 32'd104595, R_53281_CONSTANT = 32'd53281;
+parameter R_76284_CONSTANT = 32'd76284, R_25624_CONSTANT = 32'hFFFF9BE8, R_132251_CONSTANT = 32'd132251, R_104595_CONSTANT = 32'd104595, R_53281_CONSTANT = 32'hFFFF2FDF;
 
 // Data counter for getting RGB data of a pixel
 logic [17:0] data_counter;
@@ -97,15 +97,21 @@ assign SRAM_read_high_byte = SRAM_read_data[15:8];
 assign SRAM_read_low_byte = SRAM_read_data[7:0];
 
 // For Colorspace conversion
-logic [7:0] RED, GREEN, BLUE, Y_ODD, Y_EVEN, U_ODD, U_EVEN, V_ODD, V_EVEN, Y_multi_EVEN, U_multi_EVEN, V_multi_EVEN, Y_multi_ODD, U_multi_ODD, V_multi_ODD;
+logic [31:0] RED, GREEN, BLUE, Y_ODD, Y_EVEN, U_ODD, U_EVEN, V_ODD, V_EVEN, Y_multi_EVEN, U_multi_EVEN, V_multi_EVEN, Y_multi_ODD, U_multi_ODD, V_multi_ODD;
 
 //logic [32:0]  
 
 logic [31:0] U_21, U_52, U_159, V_21, V_52, V_159;
 
-logic [63:0] R_result_EVEN, G_result_EVEN, B_result_EVEN, R_result_ODD, G_result_ODD, B_result_ODD;
+logic [31:0] R_result_EVEN, G_result_EVEN, B_result_EVEN, R_result_ODD, G_result_ODD, B_result_ODD;
 
-logic [7:0] R_writable, G_writable, B_writable;
+logic [7:0] R_writable_even, G_writable_even, B_writable_even, R_writable_odd, G_writable_odd, B_writable_odd;
+
+logic [15:0] R_0, R_1, R_2;
+
+assign R_0 = {R_writable_even, G_writable_even};
+assign R_1 = {B_writable_even, R_writable_odd};
+assign R_2 = {G_writable_odd, B_writable_odd};
 
 logic [8:0] U_N [7:0];
 logic [8:0] V_N [7:0];
@@ -118,13 +124,13 @@ assign V_21 = V_N[5] + V_N[0];
 assign V_52 = V_N[4] + V_N[1];
 assign V_159 = V_N[3] + V_N[2];
 
-assign Y_multi_EVEN = Y_EVEN - 16;
-assign U_multi_EVEN = U_EVEN - 128;
-assign V_multi_EVEN = V_EVEN - 128;
+assign Y_multi_EVEN = Y_EVEN - 8'd16;
+assign U_multi_EVEN = U_EVEN - 8'd128;
+assign V_multi_EVEN = V_EVEN - 8'd128;
 
-assign Y_multi_ODD = Y_ODD - 16;
-assign U_multi_ODD = U_ODD - 128;
-assign V_multi_ODD = V_ODD - 128;
+assign Y_multi_ODD = Y_ODD - 8'd16;
+assign U_multi_ODD = U_ODD[31:8] - 8'd128;
+assign V_multi_ODD = V_ODD[31:8] - 8'd128;
 
 logic [31:0] mul0_op1, mul0_op2, mul0_result;
 logic [31:0] mul1_op1, mul1_op2, mul1_result;
@@ -150,6 +156,37 @@ PB_Controller PB_unit (
 	.Resetn(resetn),
 	.PB_signal(PUSH_BUTTON_I),	
 	.PB_pushed(PB_pushed)
+);
+
+clipper clipper_r_odd(
+	.Resetn(resetn),
+	.value(R_result_ODD[31:16]),
+	.clipped(R_writable_odd)
+);
+clipper clipper_r_even(
+	.Resetn(resetn),
+	.value(R_result_EVEN[31:16]),
+	.clipped(R_writable_even)
+);
+clipper clipper_g_even(
+	.Resetn(resetn),
+	.value(G_result_EVEN[31:16]),
+	.clipped(G_writable_even)
+);
+clipper clipper_g_odd(
+	.Resetn(resetn),
+	.value(G_result_ODD[31:16]),
+	.clipped(G_writable_odd)
+);
+clipper clipper_b_even(
+	.Resetn(resetn),
+	.value(B_result_EVEN[31:16]),
+	.clipped(B_writable_even)
+);
+clipper clipper_b_odd(
+	.Resetn(resetn),
+	.value(B_result_ODD[31:16]),
+	.clipped(B_writable_odd)
 );
 
 // SRAM unit
@@ -267,6 +304,14 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		V_N[6] <= 1'b0;
 		V_N[7] <= 1'b0;
 
+		R_result_EVEN <= 1'b0;
+		G_result_EVEN <= 1'b0;
+		B_result_EVEN <= 1'b0;
+
+		R_result_ODD <= 1'b0;
+		G_result_ODD <= 1'b0;
+		B_result_ODD <= 1'b0;
+
 	end else begin
 		case (state)
 		S_IDLE_TOP: begin
@@ -370,7 +415,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		S_CALC_R01: begin
 
 			R_result_EVEN <= mul0_result + mul2_result;
-			G_result_EVEN <= mul0_result - mul1_result;
+			G_result_EVEN <= mul0_result + mul1_result;
 			B_result_EVEN <= mul0_result;
 
 			mul0_op1 <= 0;
@@ -386,7 +431,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 		S_CALC_R10: begin
 
-			G_result_EVEN <= G_result_EVEN - mul2_result;
+			G_result_EVEN <= G_result_EVEN + mul2_result;
 			B_result_EVEN <= B_result_EVEN + mul1_result;
 
 			mul0_op1 <= Y_multi_ODD;
@@ -404,7 +449,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		S_CALC_R11: begin
 
 			R_result_ODD <= mul0_result + mul2_result;
-			G_result_ODD <= mul0_result - mul1_result;
+			G_result_ODD <= mul0_result + mul1_result;
 			B_result_ODD <= mul0_result;
 
 			mul0_op1 <= 0;
@@ -414,6 +459,14 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 			mul2_op2 <= R_53281_CONSTANT;
 			
+			state <= S_END_ROW;
+		end
+
+		S_END_ROW: begin
+
+			G_result_ODD <= G_result_ODD + mul2_result;
+			B_result_ODD <= B_result_ODD + mul1_result;
+
 			state <= S_IDLE_TOP;
 		end
 

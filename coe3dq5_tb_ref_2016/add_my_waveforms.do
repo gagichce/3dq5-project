@@ -19,5 +19,34 @@ add wave -hexadecimal uut/U_EVEN
 add wave -hexadecimal uut/U_ODD
 add wave -hexadecimal uut/V_EVEN
 add wave -hexadecimal uut/V_ODD
-add wave -decimal uut/pixel_X_pos
-add wave -decimal uut/pixel_Y_pos
+
+
+add wave -hexadecimal uut/mul0/result_calculation_long
+add wave -hexadecimal uut/mul1/result_calculation_long
+add wave -hexadecimal uut/mul2/result_calculation_long
+add wave -hexadecimal uut/mul0_result
+add wave -hexadecimal uut/mul1_result
+add wave -hexadecimal uut/mul2_result
+
+add wave -hexadecimal uut/U_multi_ODD
+add wave -hexadecimal uut/V_multi_ODD
+add wave -hexadecimal uut/U_multi_EVEN
+add wave -hexadecimal uut/V_multi_EVEN
+
+add wave -hexadecimal uut/R_result_EVEN
+add wave -hexadecimal uut/G_result_EVEN
+add wave -hexadecimal uut/B_result_EVEN
+add wave -hexadecimal uut/R_result_ODD
+add wave -hexadecimal uut/G_result_ODD
+add wave -hexadecimal uut/B_result_ODD
+
+
+
+
+add wave -hexadecimal uut/R_writable_odd
+add wave -hexadecimal uut/G_writable_odd
+add wave -hexadecimal uut/B_writable_odd
+
+add wave -hexadecimal uut/R_writable_even
+add wave -hexadecimal uut/G_writable_even
+add wave -hexadecimal uut/B_writable_even

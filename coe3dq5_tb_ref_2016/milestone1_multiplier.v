@@ -11,10 +11,10 @@ module milestone1_multiplier (
 
 logic [31:0] op1, op2;
 
-logic [63:0] result_calculation_long;
+logic signed [63:0] result_calculation_long;
 
 assign result = result_calculation_long[31:0];
-assign result_calculation_long = op1 * op2;
+assign result_calculation_long = {{32{op1[31]}},op1} * {{32{op2[31]}},op2}; //sign extention on the operands
 
 always_comb begin
 	if(Resetn == 1'b0) begin
