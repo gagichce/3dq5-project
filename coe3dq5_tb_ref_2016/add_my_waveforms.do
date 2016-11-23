@@ -10,6 +10,7 @@ add wave -hexadecimal uut/SRAM_write_data
 add wave -hexadecimal uut/SRAM_read_data
 add wave -hexadecimal uut/SRAM_address
 add wave -hexadecimal uut/data_counter
+add wave -hexadecimal uut/start_row
 add wave -hexadecimal uut/end_row
 
 add wave -hexadecimal uut/U_N

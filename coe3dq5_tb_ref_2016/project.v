@@ -158,7 +158,7 @@ assign resetn = ~SWITCH_I[17] && SRAM_ready;
 logic start_row;
 logic end_row;
 
-assign end_row = (data_counter % 320) >= 318;
+assign end_row = (data_counter % 160) >= 156;
 
 
 // Each rectangle will have different color
@@ -278,7 +278,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 				V_EVEN <= V_N[3];
 				
-				if(data_counter[0]) begin
+				if(data_counter[0] && (~end_row)) begin
 					V_N[5] <= SRAM_read_high_byte;
 					V_N[6] <= SRAM_read_low_byte;
 				end else begin
@@ -337,6 +337,8 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			mul2_op2 <= R_104595_CONSTANT;
 
 			state <= S_CALC_R01;
+
+			if((data_counter % 160 == 0) && ~start_row) state <= S_END_ROW;
 		end
 
 		S_CALC_R01: begin
@@ -397,7 +399,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 			U_EVEN <= U_N[3];
 
-			if(~data_counter[0]) begin
+			if(~data_counter[0] && (~end_row)) begin
 				U_N[5] <= SRAM_read_high_byte;
 				U_N[6] <= SRAM_read_low_byte;
 			end else begin
