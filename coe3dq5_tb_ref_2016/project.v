@@ -64,6 +64,8 @@ parameter RED_OFFSET = 18'd146944,
 parameter U_21_CONSTANT = 32'd21, U_52_CONSTANT = 32'd52, U_159_CONSTANT = 32'd159;
 parameter R_76284_CONSTANT = 32'd76284, R_25624_CONSTANT = 32'hFFFF9BE8, R_132251_CONSTANT = 32'd132251, R_104595_CONSTANT = 32'd104595, R_53281_CONSTANT = 32'hFFFF2FDF;
 
+parameter ROW_LENGTH = 16'd320, COLUMN_LENGTH = 16'd240;
+
 // Data counter for getting RGB data of a pixel
 logic [17:0] data_counter;
 state_top state;
@@ -99,8 +101,6 @@ assign SRAM_read_low_byte = SRAM_read_data[7:0];
 // For Colorspace conversion
 logic [31:0] RED, GREEN, BLUE, Y_ODD, Y_EVEN, U_ODD, U_EVEN, V_ODD, V_EVEN, Y_multi_EVEN, U_multi_EVEN, V_multi_EVEN, Y_multi_ODD, U_multi_ODD, V_multi_ODD;
 
-//logic [32:0]  
-
 logic [31:0] U_21, U_52, U_159, V_21, V_52, V_159;
 
 logic [31:0] R_result_EVEN, G_result_EVEN, B_result_EVEN, R_result_ODD, G_result_ODD, B_result_ODD;
@@ -109,9 +109,13 @@ logic [7:0] R_writable_even, G_writable_even, B_writable_even, R_writable_odd, G
 
 logic [15:0] R_0, R_1, R_2;
 
+logic [7:0] row_offset, column_offset;
+
 assign R_0 = {R_writable_even, G_writable_even};
 assign R_1 = {B_writable_even, R_writable_odd};
 assign R_2 = {G_writable_odd, B_writable_odd};
+
+logic [17:0] RGB_OFFSET_ADDRESS;
 
 logic [8:0] U_N [7:0];
 logic [8:0] V_N [7:0];
@@ -150,6 +154,258 @@ logic RED_second_word;
 
 assign resetn = ~SWITCH_I[17] && SRAM_ready;
 
+
+logic start_row;
+
+
+// Each rectangle will have different color
+assign color = rect_col_count + rect_row_count;
+
+always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
+	if (resetn == 1'b0) begin
+		state <= S_IDLE_TOP;
+		S_IDLE_WAIT <= 2'b00;
+		rect_row_count <= 3'd0;
+		rect_col_count <= 3'd0;
+		rect_width_count <= 6'd0;
+		rect_height_count <= 5'd0;
+		
+		VGA_red <= 10'd0;
+		VGA_green <= 10'd0;
+		VGA_blue <= 10'd0;				
+		
+		SRAM_we_n <= 1'b1;
+		SRAM_write_data <= 16'd0;
+		SRAM_address <= 18'd0;
+		
+		data_counter <= 18'd0;
+		RED_second_word <= 1'b0;
+
+		Y_ODD <= 1'b0;
+		Y_EVEN <= 1'b0;
+		U_ODD <= 1'b0;
+		U_EVEN <= 1'b0;
+		V_ODD <= 1'b0;
+		V_EVEN <= 1'b0;
+ 		
+ 		U_N[0] <= 1'b0; U_N[1] <= 1'b0; U_N[2] <= 1'b0; U_N[3] <= 1'b0; U_N[4] <= 1'b0; U_N[5] <= 1'b0; U_N[6] <= 1'b0; U_N[7] <= 1'b0;
+		V_N[0] <= 1'b0; V_N[1] <= 1'b0; V_N[2] <= 1'b0; V_N[3] <= 1'b0; V_N[4] <= 1'b0; V_N[5] <= 1'b0; V_N[6] <= 1'b0; V_N[7] <= 1'b0;
+
+		R_result_EVEN <= 1'b0;
+		G_result_EVEN <= 1'b0;
+		B_result_EVEN <= 1'b0;
+
+		R_result_ODD <= 1'b0;
+		G_result_ODD <= 1'b0;
+		B_result_ODD <= 1'b0;
+		start_row <= 1'b0;
+		
+		RGB_OFFSET_ADDRESS <= 1'b0;
+		row_offset <= 1'b0;
+
+	end else begin
+		case (state)
+		S_IDLE_TOP: begin
+			S_IDLE_WAIT <= S_IDLE_WAIT + 1'b1;
+			if (S_IDLE_WAIT == 2'b1) begin
+				S_IDLE_WAIT <= 1'b0;
+				state <= S_READ_U_0;
+				SRAM_address <= data_counter + U_OFFSET;
+			end
+			done <= 1'b1;
+		end
+
+		S_READ_U_0: begin
+			state <= S_READ_U_1;
+			SRAM_address <= data_counter + U_OFFSET + 1; 
+		end
+
+		S_READ_U_1: begin
+			state <= S_READ_V_0;
+			SRAM_address <= data_counter + V_OFFSET; 
+		end
+
+		S_READ_V_0: begin
+			SRAM_address <= data_counter + V_OFFSET + 1; 
+			U_EVEN <= SRAM_read_high_byte;
+			U_N[0] <= SRAM_read_high_byte;
+			U_N[1] <= SRAM_read_high_byte;
+			U_N[2] <= SRAM_read_high_byte;
+			U_N[3] <= SRAM_read_low_byte;
+			state <= S_READ_V_1;
+
+		end
+		
+		S_READ_V_1: begin
+			SRAM_address <= data_counter + Y_OFFSET;
+			U_N[4] <= SRAM_read_high_byte;
+			U_N[5] <= SRAM_read_low_byte;
+			state <= S_READ_Y;
+		end
+
+		S_READ_Y: begin
+			V_EVEN <= SRAM_read_high_byte;
+			V_N[0] <= SRAM_read_high_byte;
+			V_N[1] <= SRAM_read_high_byte;
+			V_N[2] <= SRAM_read_high_byte;
+			V_N[3] <= SRAM_read_low_byte;
+			state <= S_START_ROW;
+		end
+		S_START_ROW: begin
+			V_N[4] <= SRAM_read_high_byte;
+			V_N[5] <= SRAM_read_low_byte;
+			
+			start_row <= 1'b1;
+
+			state <= S_CALC_U;
+		end
+		S_CALC_U: begin
+			if(~start_row) begin
+				SRAM_write_data <= R_1;
+				SRAM_address <= RGB_OFFSET_ADDRESS + 2'b01;
+				SRAM_we_n <= 1'b0;
+				G_result_ODD <= G_result_ODD + mul2_result;
+				B_result_ODD <= B_result_ODD + mul1_result;
+			end
+
+			mul0_op1 <= U_21;
+			mul0_op2 <= U_21_CONSTANT;
+			mul1_op1 <= U_52;
+			mul1_op2 <= U_52_CONSTANT;
+			mul2_op1 <= U_159;
+			mul2_op2 <= U_159_CONSTANT;
+
+			state <= S_CALC_V;
+		end
+		S_CALC_V: begin
+
+			if(~start_row) begin
+				SRAM_write_data <= R_2;
+				SRAM_address <= RGB_OFFSET_ADDRESS  + 2'b10;
+				SRAM_we_n <= 1'b0;
+			end
+
+			U_ODD <= mul0_result - mul1_result + mul2_result + 128;
+
+			mul0_op1 <= V_21;
+			mul0_op2 <= U_21_CONSTANT;
+			mul1_op1 <= V_52;
+			mul1_op2 <= U_52_CONSTANT;
+			mul2_op1 <= V_159;
+			mul2_op2 <= U_159_CONSTANT;
+
+			//load Y
+			Y_EVEN <= SRAM_read_high_byte;
+			Y_ODD <= SRAM_read_low_byte;
+			
+			state <= S_CALC_R00;
+		end
+
+		S_CALC_R00: begin
+
+			SRAM_we_n <= 1'b1; //stop writing to SRAM
+
+			SRAM_address <= U_OFFSET + data_counter[17:1] + 2;
+
+			V_ODD <= mul0_result - mul1_result + mul2_result + 128;
+
+			mul0_op1 <= Y_multi_EVEN;
+			mul0_op2 <= R_76284_CONSTANT;
+
+			mul1_op1 <= U_multi_EVEN;
+			mul1_op2 <= R_25624_CONSTANT;
+
+			mul2_op1 <= V_multi_EVEN;
+			mul2_op2 <= R_104595_CONSTANT;
+
+			state <= S_CALC_R01;
+		end
+
+		S_CALC_R01: begin
+
+			SRAM_address <= V_OFFSET + data_counter[17:1] + 2;
+
+			
+			R_result_EVEN <= mul0_result + mul2_result;
+			G_result_EVEN <= mul0_result + mul1_result;
+			B_result_EVEN <= mul0_result;
+
+			mul0_op1 <= 32'b11;
+			mul0_op2 <= data_counter;
+
+			mul1_op2 <= R_132251_CONSTANT;
+
+			mul2_op2 <= R_53281_CONSTANT;
+			
+			state <= S_CALC_R10;
+		end
+
+
+		S_CALC_R10: begin
+			RGB_OFFSET_ADDRESS <= RGB_OFFSET + mul0_result[31:1]; //calculate the next offset to be used in the next round
+			
+			SRAM_address <= Y_OFFSET + data_counter + 1;
+
+			G_result_EVEN <= G_result_EVEN + mul2_result;
+			B_result_EVEN <= B_result_EVEN + mul1_result;
+			
+			
+			mul0_op1 <= Y_multi_ODD;
+			mul0_op2 <= R_76284_CONSTANT;
+
+			mul1_op1 <= U_multi_ODD;
+			mul1_op2 <= R_25624_CONSTANT;
+
+			mul2_op1 <= V_multi_ODD;
+			mul2_op2 <= R_104595_CONSTANT;
+			
+			state <= S_CALC_R11;
+			start_row <= 1'b0;
+		end
+
+		S_CALC_R11: begin
+
+			if(~start_row) begin
+				SRAM_write_data <= R_0;
+				SRAM_address <= RGB_OFFSET_ADDRESS;
+				SRAM_we_n <= 1'b0;
+			end
+
+			U_N[]
+
+			R_result_ODD <= mul0_result + mul2_result;
+			G_result_ODD <= mul0_result + mul1_result;
+			B_result_ODD <= mul0_result;
+
+			mul0_op1 <= 0;
+			mul0_op2 <= 0;
+
+			mul1_op2 <= R_132251_CONSTANT;
+
+			mul2_op2 <= R_53281_CONSTANT;
+			
+
+			if((data_counter % 16'd320) == 16'd319) begin
+				state <= S_END_ROW;
+			end else begin
+				state <= S_CALC_U;
+				data_counter <= data_counter + 1'b1;
+			end
+
+
+			if(data_counter == 2'b10) state <= S_IDLE_TOP;			
+		end
+
+		S_END_ROW: begin
+
+			state <= S_IDLE_TOP;
+		end
+
+		default: state <= S_IDLE_TOP;
+		endcase
+	end
+end
+
 // Push Button unit
 PB_Controller PB_unit (
 	.Clock_50(CLOCK_50_I),
@@ -157,7 +413,6 @@ PB_Controller PB_unit (
 	.PB_signal(PUSH_BUTTON_I),	
 	.PB_pushed(PB_pushed)
 );
-
 clipper clipper_r_odd(
 	.Resetn(resetn),
 	.value(R_result_ODD[31:16]),
@@ -254,225 +509,5 @@ milestone1_multiplier mul2 (
 	.select(1'b0),
 	.result(mul2_result)
 );
-
-
-// Each rectangle will have different color
-assign color = rect_col_count + rect_row_count;
-
-always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
-	if (resetn == 1'b0) begin
-		state <= S_IDLE_TOP;
-		S_IDLE_WAIT <= 2'b00;
-		rect_row_count <= 3'd0;
-		rect_col_count <= 3'd0;
-		rect_width_count <= 6'd0;
-		rect_height_count <= 5'd0;
-		
-		VGA_red <= 10'd0;
-		VGA_green <= 10'd0;
-		VGA_blue <= 10'd0;				
-		
-		SRAM_we_n <= 1'b1;
-		SRAM_write_data <= 16'd0;
-		SRAM_address <= 18'd0;
-		
-		data_counter <= 18'd0;
-		RED_second_word <= 1'b0;
-
-		Y_ODD <= 1'b0;
-		Y_EVEN <= 1'b0;
-		U_ODD <= 1'b0;
-		U_EVEN <= 1'b0;
-		V_ODD <= 1'b0;
-		V_EVEN <= 1'b0;
-
-		U_N[0] <= 1'b0;
-		U_N[1] <= 1'b0;
-		U_N[2] <= 1'b0;
-		U_N[3] <= 1'b0;
-		U_N[4] <= 1'b0;
-		U_N[5] <= 1'b0;
-		U_N[6] <= 1'b0;
-		U_N[7] <= 1'b0;
-
-		V_N[0] <= 1'b0;
-		V_N[1] <= 1'b0;
-		V_N[2] <= 1'b0;
-		V_N[3] <= 1'b0;
-		V_N[4] <= 1'b0;
-		V_N[5] <= 1'b0;
-		V_N[6] <= 1'b0;
-		V_N[7] <= 1'b0;
-
-		R_result_EVEN <= 1'b0;
-		G_result_EVEN <= 1'b0;
-		B_result_EVEN <= 1'b0;
-
-		R_result_ODD <= 1'b0;
-		G_result_ODD <= 1'b0;
-		B_result_ODD <= 1'b0;
-
-	end else begin
-		case (state)
-		S_IDLE_TOP: begin
-			S_IDLE_WAIT <= S_IDLE_WAIT + 1'b1;
-			if (S_IDLE_WAIT == 2'b1) begin
-				S_IDLE_WAIT <= 1'b0;
-				state <= S_READ_U_0;
-				SRAM_address <= data_counter + U_OFFSET;
-			end
-			done <= 1'b1;
-		end
-
-		S_READ_U_0: begin
-			state <= S_READ_U_1;
-			SRAM_address <= data_counter + U_OFFSET + 1; 
-		end
-
-		S_READ_U_1: begin
-			state <= S_READ_V_0;
-			SRAM_address <= data_counter + V_OFFSET; 
-		end
-
-		S_READ_V_0: begin
-			SRAM_address <= data_counter + V_OFFSET + 1; 
-			U_EVEN <= SRAM_read_high_byte;
-			U_N[0] <= SRAM_read_high_byte;
-			U_N[1] <= SRAM_read_high_byte;
-			U_N[2] <= SRAM_read_high_byte;
-			U_N[3] <= SRAM_read_low_byte;
-			state <= S_READ_V_1;
-
-		end
-		
-		S_READ_V_1: begin
-			SRAM_address <= data_counter + Y_OFFSET;
-			U_N[4] <= SRAM_read_high_byte;
-			U_N[5] <= SRAM_read_low_byte;
-			state <= S_READ_Y;
-		end
-
-		S_READ_Y: begin
-			V_EVEN <= SRAM_read_high_byte;
-			V_N[0] <= SRAM_read_high_byte;
-			V_N[1] <= SRAM_read_high_byte;
-			V_N[2] <= SRAM_read_high_byte;
-			V_N[3] <= SRAM_read_low_byte;
-			state <= S_START_ROW;
-		end
-		S_START_ROW: begin
-			V_N[4] <= SRAM_read_high_byte;
-			V_N[5] <= SRAM_read_low_byte;
-			
-			state <= S_CALC_U;
-		end
-		S_CALC_U: begin
-
-
-			mul0_op1 <= U_21;
-			mul0_op2 <= U_21_CONSTANT;
-			mul1_op1 <= U_52;
-			mul1_op2 <= U_52_CONSTANT;
-			mul2_op1 <= U_159;
-			mul2_op2 <= U_159_CONSTANT;
-
-			state <= S_CALC_V;
-		end
-
-		S_CALC_V: begin
-
-			U_ODD <= mul0_result - mul1_result + mul2_result + 128;
-
-			mul0_op1 <= V_21;
-			mul0_op2 <= U_21_CONSTANT;
-			mul1_op1 <= V_52;
-			mul1_op2 <= U_52_CONSTANT;
-			mul2_op1 <= V_159;
-			mul2_op2 <= U_159_CONSTANT;
-
-			//load Y
-			Y_EVEN <= SRAM_read_high_byte;
-			Y_ODD <= SRAM_read_low_byte;
-			
-			state <= S_CALC_R00;
-		end
-
-		S_CALC_R00: begin
-			V_ODD <= mul0_result - mul1_result + mul2_result + 128;
-
-			mul0_op1 <= Y_multi_EVEN;
-			mul0_op2 <= R_76284_CONSTANT;
-
-			mul1_op1 <= U_multi_EVEN;
-			mul1_op2 <= R_25624_CONSTANT;
-
-			mul2_op1 <= V_multi_EVEN;
-			mul2_op2 <= R_104595_CONSTANT;
-
-			state <= S_CALC_R01;
-		end
-
-		S_CALC_R01: begin
-
-			R_result_EVEN <= mul0_result + mul2_result;
-			G_result_EVEN <= mul0_result + mul1_result;
-			B_result_EVEN <= mul0_result;
-
-			mul0_op1 <= 0;
-			mul0_op2 <= 0;
-
-			mul1_op2 <= R_132251_CONSTANT;
-
-			mul2_op2 <= R_53281_CONSTANT;
-			
-			state <= S_CALC_R10;
-		end
-
-
-		S_CALC_R10: begin
-
-			G_result_EVEN <= G_result_EVEN + mul2_result;
-			B_result_EVEN <= B_result_EVEN + mul1_result;
-
-			mul0_op1 <= Y_multi_ODD;
-			mul0_op2 <= R_76284_CONSTANT;
-
-			mul1_op1 <= U_multi_ODD;
-			mul1_op2 <= R_25624_CONSTANT;
-
-			mul2_op1 <= V_multi_ODD;
-			mul2_op2 <= R_104595_CONSTANT;
-			
-			state <= S_CALC_R11;
-		end
-
-		S_CALC_R11: begin
-
-			R_result_ODD <= mul0_result + mul2_result;
-			G_result_ODD <= mul0_result + mul1_result;
-			B_result_ODD <= mul0_result;
-
-			mul0_op1 <= 0;
-			mul0_op2 <= 0;
-
-			mul1_op2 <= R_132251_CONSTANT;
-
-			mul2_op2 <= R_53281_CONSTANT;
-			
-			state <= S_END_ROW;
-		end
-
-		S_END_ROW: begin
-
-			G_result_ODD <= G_result_ODD + mul2_result;
-			B_result_ODD <= B_result_ODD + mul1_result;
-
-			state <= S_IDLE_TOP;
-		end
-
-		default: state <= S_IDLE_TOP;
-		endcase
-	end
-end
 
 endmodule
