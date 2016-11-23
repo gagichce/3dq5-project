@@ -156,6 +156,9 @@ assign resetn = ~SWITCH_I[17] && SRAM_ready;
 
 
 logic start_row;
+logic end_row;
+
+assign end_row = (data_counter % 320) >= 318;
 
 
 // Each rectangle will have different color
@@ -266,6 +269,21 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				SRAM_we_n <= 1'b0;
 				G_result_ODD <= G_result_ODD + mul2_result;
 				B_result_ODD <= B_result_ODD + mul1_result;
+
+				V_N[0] <= V_N[1];
+				V_N[1] <= V_N[2];
+				V_N[2] <= V_N[3];
+				V_N[3] <= V_N[4];
+				V_N[4] <= V_N[5];
+
+				V_EVEN <= V_N[3];
+				
+				if(data_counter[0]) begin
+					V_N[5] <= SRAM_read_high_byte;
+					V_N[6] <= SRAM_read_low_byte;
+				end else begin
+					V_N[5] <= V_N[6];
+				end
 			end
 
 			mul0_op1 <= U_21;
@@ -281,7 +299,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 			if(~start_row) begin
 				SRAM_write_data <= R_2;
-				SRAM_address <= RGB_OFFSET_ADDRESS  + 2'b10;
+				SRAM_address <= RGB_OFFSET_ADDRESS + 2'b10;
 				SRAM_we_n <= 1'b0;
 			end
 
@@ -342,7 +360,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 
 		S_CALC_R10: begin
-			RGB_OFFSET_ADDRESS <= RGB_OFFSET + mul0_result[31:1]; //calculate the next offset to be used in the next round
+			RGB_OFFSET_ADDRESS <= RGB_OFFSET + mul0_result; //calculate the next offset to be used in the next round
 			
 			SRAM_address <= Y_OFFSET + data_counter + 1;
 
@@ -370,8 +388,23 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				SRAM_address <= RGB_OFFSET_ADDRESS;
 				SRAM_we_n <= 1'b0;
 			end
+			
+			U_N[0] <= U_N[1];
+			U_N[1] <= U_N[2];
+			U_N[2] <= U_N[3];
+			U_N[3] <= U_N[4];
+			U_N[4] <= U_N[5];
 
-			U_N[]
+			U_EVEN <= U_N[3];
+
+			if(~data_counter[0]) begin
+				U_N[5] <= SRAM_read_high_byte;
+				U_N[6] <= SRAM_read_low_byte;
+			end else begin
+				U_N[5] <= U_N[6];
+			end
+
+			//U_N[7] = SRAM_read_low_byte;
 
 			R_result_ODD <= mul0_result + mul2_result;
 			G_result_ODD <= mul0_result + mul1_result;
@@ -393,7 +426,10 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			end
 
 
-			if(data_counter == 2'b10) state <= S_IDLE_TOP;			
+			if(data_counter == 9'd320) begin
+				state <= S_IDLE_TOP;			
+				SRAM_we_n <= 1'b1;
+			end 
 		end
 
 		S_END_ROW: begin
