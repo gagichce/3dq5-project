@@ -213,23 +213,23 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			if (S_IDLE_WAIT == 2'b1) begin
 				S_IDLE_WAIT <= 1'b0;
 				state <= S_READ_U_0;
-				SRAM_address <= data_counter + U_OFFSET;
+				SRAM_address <= data_counter[17:1] + U_OFFSET;
 			end
 			done <= 1'b1;
 		end
 
 		S_READ_U_0: begin
 			state <= S_READ_U_1;
-			SRAM_address <= data_counter + U_OFFSET + 1; 
+			SRAM_address <= data_counter[17:1] + U_OFFSET + 1; 
 		end
 
 		S_READ_U_1: begin
 			state <= S_READ_V_0;
-			SRAM_address <= data_counter + V_OFFSET; 
+			SRAM_address <= data_counter[17:1] + V_OFFSET; 
 		end
 
 		S_READ_V_0: begin
-			SRAM_address <= data_counter + V_OFFSET + 1; 
+			SRAM_address <= data_counter[17:1] + V_OFFSET + 1; 
 			U_EVEN <= SRAM_read_high_byte;
 			U_N[0] <= SRAM_read_high_byte;
 			U_N[1] <= SRAM_read_high_byte;
@@ -419,24 +419,16 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 			mul2_op2 <= R_53281_CONSTANT;
 			
-
-			if((data_counter % 16'd320) == 16'd319) begin
-				state <= S_END_ROW;
-			end else begin
-				state <= S_CALC_U;
-				data_counter <= data_counter + 1'b1;
-			end
-
-
-			if(data_counter == 9'd320) begin
-				state <= S_IDLE_TOP;			
-				SRAM_we_n <= 1'b1;
-			end 
+			state <= S_CALC_U;
+			data_counter <= data_counter + 1'b1;
 		end
 
 		S_END_ROW: begin
-
-			state <= S_IDLE_TOP;
+			//check if last row
+			if(data_counter >= 38400) begin state <= S_IDLE_TOP; end else begin			
+				SRAM_address <= data_counter[17:1] + U_OFFSET;
+				state <= S_READ_U_0;
+			end
 		end
 
 		default: state <= S_IDLE_TOP;

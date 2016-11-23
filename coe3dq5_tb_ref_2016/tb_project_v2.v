@@ -291,7 +291,7 @@ initial begin
 	@ (posedge Clock_50);		//let sram writes finish, not sure if this is really needed...
 	@ (posedge Clock_50);
 	@ (posedge Clock_50);
-		$stop;
+	
 	check_sram_write_counts;	//this task checks that we've written to all the locations that we were supposed to
 	
 	write_PPM_file;
