@@ -231,15 +231,15 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		S_DP_TEST_0: begin
 			state <= S_DP_TEST_1;
 			DPRAM_write_address <= 1'b0;
-			DPRAM_read_address <= 1'b1;
+			DPRAM_read_address <= 12;
 			DPRAM_write_data <= 16'd666;
-			DPRAM_wen <= 1'b1;
+			//DPRAM_wen <= 1'b1;
 		end
 
 		S_DP_TEST_1: begin
 			state <= S_DP_TEST_2;
 			DPRAM_wen <= 1'b0;		
-			DPRAM_read_address <= 1'b0;	
+			DPRAM_read_address <= 83;	
 		end
 
 		S_DP_TEST_2: begin
