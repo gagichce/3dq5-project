@@ -8,11 +8,11 @@ add wave uut/state
 add wave uut/SRAM_we_n
 add wave -hexadecimal uut/SRAM_write_data
 add wave -hexadecimal uut/SRAM_read_data
-add wave -hexadecimal uut/SRAM_address
+add wave -decimal uut/SRAM_address
 
 add wave uut/DPRAM_wen
 add wave -hexadecimal uut/DPRAM_write_data
-add wave -hexadecimal uut/DPRAM_write_address
+add wave -decimal uut/DPRAM_write_address
 add wave -hexadecimal uut/DPRAM_read_address
 add wave -decimal uut/DPRAM_read_data
 

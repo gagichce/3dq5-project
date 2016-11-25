@@ -64,6 +64,8 @@ parameter RED_OFFSET = 18'd146944,
 parameter U_21_CONSTANT = 32'd21, U_52_CONSTANT = 32'd52, U_159_CONSTANT = 32'd159;
 parameter R_76284_CONSTANT = 32'd76284, R_25624_CONSTANT = 32'hFFFF9BE8, R_132251_CONSTANT = 32'd132251, R_104595_CONSTANT = 32'd104595, R_53281_CONSTANT = 32'hFFFF2FDF;
 
+parameter IDCT_OFFSET = 32'd76800, C_OFFSET= 32'd0, CT_OFFSET = 32'd64, LOADED_BLOCK_OFFSET = 32'd128, RESULT_OFFSET = 32'd192;
+
 parameter ROW_LENGTH = 16'd320, COLUMN_LENGTH = 16'd240;
 
 // Data counter for getting RGB data of a pixel
@@ -79,6 +81,13 @@ assign even_counter = ~data_counter[0];
 logic [2:0] S_IDLE_WAIT;
 // For Push button
 logic [3:0] PB_pushed;
+
+logic [31:0] X_BLOCK_OFFSET, Y_BLOCK_OFFSET, X_Y_BLOCK_OFFSET;
+logic [31:0] X_BLOCK_INC, Y_BLOCK_INC;
+logic [7:0] BLOCK_POSITION;
+
+logic [7:0] C_COEF [7:0];
+logic [7:0] C_COEF_TRANS [7:0];
 
 // For VGA
 logic [9:0] VGA_red, VGA_green, VGA_blue;
@@ -98,6 +107,7 @@ logic SRAM_ready;
 assign SRAM_read_high_byte = SRAM_read_data[15:8];
 assign SRAM_read_low_byte = SRAM_read_data[7:0];
 
+//for DP rams
 logic [31:0] DPRAM_write_data, DPRAM_read_data;
 logic [8:0] DPRAM_write_address, DPRAM_read_address;
 logic DPRAM_wen;
@@ -158,7 +168,6 @@ logic RED_second_word;
 
 assign resetn = ~SWITCH_I[17] && SRAM_ready;
 
-
 logic start_row;
 logic end_row;
 
@@ -189,7 +198,14 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		DPRAM_write_data <= 16'b0;
 		DPRAM_write_address <= 9'b0;
 		DPRAM_read_address <= 9'b0;
-		
+
+		X_BLOCK_OFFSET <= 1'b0;
+		Y_BLOCK_OFFSET <= 1'b0;
+		X_BLOCK_INC <= 1'b1;
+		Y_BLOCK_INC <= 9'd320;
+		X_Y_BLOCK_OFFSET <= 1'b0;
+		BLOCK_POSITION <= 1'b0;
+
 		data_counter <= 18'd0;
 		RED_second_word <= 1'b0;
 
@@ -221,33 +237,59 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			S_IDLE_WAIT <= S_IDLE_WAIT + 1'b1;
 			if (S_IDLE_WAIT == 2'b1) begin
 				S_IDLE_WAIT <= 1'b0;
-				state <= S_DP_TEST_0;
+				state <= S_IDCT_LOAD_0;
+				X_Y_BLOCK_OFFSET <= 0;
+				BLOCK_POSITION <= BLOCK_POSITION + 1'b1;
+				SRAM_address <= IDCT_OFFSET;
+
 				//state <= S_READ_U_0;
-				//SRAM_address <= data_counter[17:1] + U_OFFSET;
+				//SRAM_address <= data_counter[17:1] + U_OFFSET; //for milestone 1
 			end
 			done <= 1'b1;
 		end
+		S_IDCT_LOAD_0: begin
+			state <= S_IDCT_LOAD_1;
+			BLOCK_POSITION <= BLOCK_POSITION + 1'b1;
 
-		S_DP_TEST_0: begin
-			state <= S_DP_TEST_1;
-			DPRAM_write_address <= 1'b0;
-			DPRAM_read_address <= 12;
-			DPRAM_write_data <= 16'd666;
-			//DPRAM_wen <= 1'b1;
+			SRAM_address <= SRAM_address + X_BLOCK_INC;
+		end
+		S_IDCT_LOAD_1: begin
+			state <= S_IDCT_LOAD_WRITE;
+			BLOCK_POSITION <= BLOCK_POSITION + 1'b1;
+			DPRAM_write_address <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b11;
+			SRAM_address <= SRAM_address + X_BLOCK_INC;
+		end
+		S_IDCT_LOAD_WRITE: begin
+			DPRAM_write_data <= SRAM_read_data;
+			DPRAM_write_address <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b11;
+			DPRAM_wen <= 1'b1;
+			if(BLOCK_POSITION == 64) begin
+				state <= S_IDCT_LOAD_FINISH_0;
+			end else begin
+				BLOCK_POSITION <= BLOCK_POSITION + 1'b1; 
+				if((BLOCK_POSITION - 1'b1) % 8 == 7) begin
+					SRAM_address <= SRAM_address + Y_BLOCK_INC - 7;
+				end else begin
+					SRAM_address <= SRAM_address + X_BLOCK_INC;
+				end
+			end
 		end
 
-		S_DP_TEST_1: begin
-			state <= S_DP_TEST_2;
-			DPRAM_wen <= 1'b0;		
-			DPRAM_read_address <= 83;	
+		S_IDCT_LOAD_FINISH_0: begin
+		state <= S_IDCT_LOAD_FINISH_1;
+			DPRAM_write_data <= SRAM_read_data;
+			DPRAM_write_address <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b10;
 		end
 
-		S_DP_TEST_2: begin
-			state <= S_DP_TEST_3;
+		S_IDCT_LOAD_FINISH_1: begin
+			state <= S_IDCT_LOAD_FINISH_2;
+			DPRAM_write_data <= SRAM_read_data;
+			DPRAM_write_address <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b01;
 		end
 
-		S_DP_TEST_3: begin
+		S_IDCT_LOAD_FINISH_2: begin
 			state <= S_IDLE_TOP;
+			DPRAM_wen <= 1'b0;
 		end
 
 		S_READ_U_0: begin
@@ -268,7 +310,6 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			U_N[2] <= SRAM_read_high_byte;
 			U_N[3] <= SRAM_read_low_byte;
 			state <= S_READ_V_1;
-
 		end
 		
 		S_READ_V_1: begin

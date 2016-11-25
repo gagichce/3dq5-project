@@ -26,9 +26,15 @@ typedef enum logic [4:0] {
 	S_FINISH_FILL_SRAM
 } state_type;
 
-typedef enum logic [4:0] {
+typedef enum logic [5:0] {
 	S_IDLE_TOP,
 	S_COLOR_CONVERSION_DELAY_0,
+	S_IDCT_LOAD_0,
+	S_IDCT_LOAD_1,
+	S_IDCT_LOAD_WRITE,
+	S_IDCT_LOAD_FINISH_0,
+	S_IDCT_LOAD_FINISH_1,
+	S_IDCT_LOAD_FINISH_2,
 	S_DP_TEST_0,
 	S_DP_TEST_1,
 	S_DP_TEST_2,
