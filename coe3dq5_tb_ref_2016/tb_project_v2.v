@@ -27,7 +27,7 @@ you will get false errors, so use the original testbench instead.
 // This is the top testbench file
 
 `define FEOF 32'hFFFFFFFF
-`define MAX_MISMATCHES 5
+`define MAX_MISMATCHES 10
 
 // file for output
 // this is only useful if decoding is done all the way through (e.g. milestone 1 is used)
@@ -35,13 +35,13 @@ you will get false errors, so use the original testbench instead.
 
 // file for comparison
 // to test milestone 2 independently, use the .sram_d1 file to check the output
-`define VERIFICATION_FILE_NAME "motorcycle.sram_d0"
+`define VERIFICATION_FILE_NAME "motorcycle.sram_d1"
 
 //// for milestone 1
-`define INPUT_FILE_NAME "motorcycle.sram_d1"
+//`define INPUT_FILE_NAME "motorcycle.sram_d1"
 
 //// for milestone 2
-//`define INPUT_FILE_NAME "motorcycle.sram_d2"
+`define INPUT_FILE_NAME "motorcycle.sram_d2"
 
 //// for milestone 3 (completed project)
 //`define INPUT_FILE_NAME "motorcycle.mic10”
@@ -189,7 +189,7 @@ begin
 	
 	//NOTE: this is for milestone 1, in different milestones we will be
 	//writing to different regions so modify as needed
-	for (i=146944; i<262144; i=i+1) begin
+	for (i=0; i<76800; i=i+1) begin
 		if (SRAM_ARRAY_write_count[i]==0) begin
 			if (error_count < `MAX_MISMATCHES) begin
 				$write("error: did not write to location %d (%x hex)\n", i, i);
@@ -309,7 +309,7 @@ always @ (posedge Clock_50) begin
 	if (uut.SRAM_we_n == 1'b0) begin	//signal names within project (instantiated as uut) should match here, assuming names from experiment4a
 	
 		//IMPORTANT: this is the "no write" memory region for milestone 1, change region for different milestones
-		if (uut.SRAM_address < 146944) begin
+		if (uut.SRAM_address < 230400) begin
 			if (warn_writing_out_of_region < `MAX_MISMATCHES) begin
 				$write("critical warning: writing outside of the RGB data region, may corrupt source data in SRAM\n");
 				$write("  writing value %d (%x hex) to location %d (%x hex), sim time %t\n", 

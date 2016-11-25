@@ -98,6 +98,10 @@ logic SRAM_ready;
 assign SRAM_read_high_byte = SRAM_read_data[15:8];
 assign SRAM_read_low_byte = SRAM_read_data[7:0];
 
+logic [31:0] DPRAM_write_data, DPRAM_read_data;
+logic [8:0] DPRAM_write_address, DPRAM_read_address;
+logic DPRAM_wen;
+
 // For Colorspace conversion
 logic [31:0] RED, GREEN, BLUE, Y_ODD, Y_EVEN, U_ODD, U_EVEN, V_ODD, V_EVEN, Y_multi_EVEN, U_multi_EVEN, V_multi_EVEN, Y_multi_ODD, U_multi_ODD, V_multi_ODD;
 
@@ -180,6 +184,11 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		SRAM_we_n <= 1'b1;
 		SRAM_write_data <= 16'd0;
 		SRAM_address <= 18'd0;
+
+		DPRAM_wen <= 1'b0;
+		DPRAM_write_data <= 16'b0;
+		DPRAM_write_address <= 9'b0;
+		DPRAM_read_address <= 9'b0;
 		
 		data_counter <= 18'd0;
 		RED_second_word <= 1'b0;
@@ -212,10 +221,33 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			S_IDLE_WAIT <= S_IDLE_WAIT + 1'b1;
 			if (S_IDLE_WAIT == 2'b1) begin
 				S_IDLE_WAIT <= 1'b0;
-				state <= S_READ_U_0;
-				SRAM_address <= data_counter[17:1] + U_OFFSET;
+				state <= S_DP_TEST_0;
+				//state <= S_READ_U_0;
+				//SRAM_address <= data_counter[17:1] + U_OFFSET;
 			end
 			done <= 1'b1;
+		end
+
+		S_DP_TEST_0: begin
+			state <= S_DP_TEST_1;
+			DPRAM_write_address <= 1'b0;
+			DPRAM_read_address <= 1'b1;
+			DPRAM_write_data <= 16'd666;
+			DPRAM_wen <= 1'b1;
+		end
+
+		S_DP_TEST_1: begin
+			state <= S_DP_TEST_2;
+			DPRAM_wen <= 1'b0;		
+			DPRAM_read_address <= 1'b0;	
+		end
+
+		S_DP_TEST_2: begin
+			state <= S_DP_TEST_3;
+		end
+
+		S_DP_TEST_3: begin
+			state <= S_IDLE_TOP;
 		end
 
 		S_READ_U_0: begin
@@ -435,6 +467,15 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		endcase
 	end
 end
+
+dual_port_ram0 ram_inst (
+	.clock(CLOCK_50_I),
+	.data(DPRAM_write_data),
+	.rdaddress(DPRAM_read_address),
+	.wraddress(DPRAM_write_address),
+	.q(DPRAM_read_data),
+	.wren(DPRAM_wen)
+);
 
 // Push Button unit
 PB_Controller PB_unit (

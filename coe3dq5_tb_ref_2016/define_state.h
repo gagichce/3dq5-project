@@ -29,6 +29,10 @@ typedef enum logic [4:0] {
 typedef enum logic [4:0] {
 	S_IDLE_TOP,
 	S_COLOR_CONVERSION_DELAY_0,
+	S_DP_TEST_0,
+	S_DP_TEST_1,
+	S_DP_TEST_2,
+	S_DP_TEST_3,
 	S_READ_Y,
 	S_READ_U_0,
 	S_READ_U_1,
