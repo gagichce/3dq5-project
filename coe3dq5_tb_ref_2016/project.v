@@ -358,6 +358,9 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			loaded_c_coef <= 1'b1;
 		end
 
+		//yes this state does the entire matrix multiplication
+		//since it is an 8x8 matrix I exploited the properties of binary counters for indexing
+		//bit banging at its best.
 		S_IDCT_MULTIPLY_0: begin
 			DPRAM_address1_a <= BLOCK_POSITION[2:0] + {{BLOCK_POSITION[9:6]}, {3{1'b0}}};
 			DPRAM_address1_b <= BLOCK_POSITION[2:0] + {{BLOCK_POSITION[9:6]}, {3{1'b0}}} + 1'b1;
@@ -387,9 +390,14 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				end
 			end
 
-			if(BLOCK_POSITION > 512) begin
-				state <= S_IDLE_TOP;
+			if(BLOCK_POSITION > 516) begin
+				state <= S_IDCT_FINISH_MULTIPLY_0;
 			end
+		end
+
+		S_IDCT_FINISH_MULTIPLY_0: begin
+			state <= S_IDLE_TOP;
+			DPRAM_wen0_a <= 1'b0;
 		end
 
 		S_READ_U_0: begin
