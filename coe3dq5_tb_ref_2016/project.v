@@ -64,7 +64,7 @@ parameter RED_OFFSET = 18'd146944,
 parameter U_21_CONSTANT = 32'd21, U_52_CONSTANT = 32'd52, U_159_CONSTANT = 32'd159;
 parameter R_76284_CONSTANT = 32'd76284, R_25624_CONSTANT = 32'hFFFF9BE8, R_132251_CONSTANT = 32'd132251, R_104595_CONSTANT = 32'd104595, R_53281_CONSTANT = 32'hFFFF2FDF;
 
-parameter IDCT_OFFSET = 32'd76800, C_OFFSET= 32'd0, CT_OFFSET = 32'd64, LOADED_BLOCK_OFFSET = 32'd128, RESULT_OFFSET = 32'd192;
+parameter IDCT_OFFSET = 32'd76800, C_OFFSET= 32'd0, CT_OFFSET = 32'd64, RESULT_OFFSET = 8'd128;
 
 parameter ROW_LENGTH = 16'd320, COLUMN_LENGTH = 16'd240;
 
@@ -84,13 +84,21 @@ logic [3:0] PB_pushed;
 
 logic [31:0] X_BLOCK_OFFSET, Y_BLOCK_OFFSET, X_Y_BLOCK_OFFSET;
 logic [31:0] X_BLOCK_INC, Y_BLOCK_INC;
-logic [7:0] BLOCK_POSITION;
-logic [7:0] BLOCK_POSITION_ADJ;
+logic [9:0] BLOCK_POSITION;
+logic [9:0] BLOCK_POSITION_ADJ;
+logic [9:0] BLOCK_POSITION_ADJ_MUL;
 
 assign BLOCK_POSITION_ADJ = BLOCK_POSITION - 2'b11;
+assign BLOCK_POSITION_ADJ_MUL = BLOCK_POSITION - 3'b110;
 
 logic [31:0] C_COEF [7:0] [7:0];
 logic [31:0] C_COEF_TRANS [7:0] [7:0];
+
+logic [31:0] tester, tester2;
+
+assign tester = C_COEF[BLOCK_POSITION_ADJ_MUL[2:0]][BLOCK_POSITION_ADJ_MUL[5:3]];
+assign tester2 = C_COEF[BLOCK_POSITION_ADJ_MUL[2:0] + 1'b1][BLOCK_POSITION_ADJ_MUL[5:3]];
+
 logic loaded_c_coef;
 
 // For VGA
@@ -231,6 +239,14 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		data_counter <= 18'd0;
 		RED_second_word <= 1'b0;
 
+		mul0_op1 <= 1'b0;
+		mul0_op2 <= 1'b0;
+		mul1_op1 <= 1'b0;
+		mul1_op2 <= 1'b0;
+		mul2_op1 <= 1'b0;
+		mul2_op2 <= 1'b0;
+
+
 		Y_ODD <= 1'b0;
 		Y_EVEN <= 1'b0;
 		U_ODD <= 1'b0;
@@ -286,7 +302,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			DPRAM_address0_a <= DPRAM_address0_a + 1'b1;
 			DPRAM_address0_b <= DPRAM_address0_b + 1'b1;
 
-			DPRAM_address1_a <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b11;
+			DPRAM_address1_a <=  BLOCK_POSITION - 2'b11;
 			SRAM_address <= SRAM_address + X_BLOCK_INC;
 		end
 		S_IDCT_LOAD_WRITE: begin
@@ -296,8 +312,8 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		  		DPRAM_address0_a <= DPRAM_address0_a + 1'b1;
 				DPRAM_address0_b <= DPRAM_address0_b + 1'b1;
 			end
-			DPRAM_write_data1_a <= SRAM_read_data;
-			DPRAM_address1_a <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b11;
+			DPRAM_write_data1_a <= {{16{SRAM_read_data[15]}},SRAM_read_data};
+			DPRAM_address1_a <= BLOCK_POSITION - 2'b11;
 			DPRAM_wen1_a <= 1'b1;
 			if(BLOCK_POSITION == 64) begin
 				state <= S_IDCT_LOAD_FINISH_0;
@@ -313,8 +329,8 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 		S_IDCT_LOAD_FINISH_0: begin
 			state <= S_IDCT_LOAD_FINISH_1;
-			DPRAM_write_data1_a <= SRAM_read_data;
-			DPRAM_address1_a <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b10;
+			DPRAM_write_data1_a <= {{16{SRAM_read_data[15]}},SRAM_read_data};
+			DPRAM_address1_a <= 8'd62;
 			if(!loaded_c_coef) begin
 				C_COEF[7][6] <= DPRAM_read_data0_a;
 		  		C_COEF_TRANS[7][6] <= DPRAM_read_data0_b;
@@ -323,8 +339,9 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 		S_IDCT_LOAD_FINISH_1: begin
 			state <= S_IDCT_LOAD_FINISH_2;
-			DPRAM_write_data1_a <= SRAM_read_data;
-			DPRAM_address1_a <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b01;
+			DPRAM_write_data1_a <= {{16{SRAM_read_data[15]}},SRAM_read_data};
+			DPRAM_address1_a <= 8'd63;
+			BLOCK_POSITION <= 1'b0;
 			if(!loaded_c_coef) begin
 				C_COEF[7][7] <= DPRAM_read_data0_a;
 		  		C_COEF_TRANS[7][7] <= DPRAM_read_data0_b;
@@ -332,9 +349,47 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		end
 
 		S_IDCT_LOAD_FINISH_2: begin
-			state <= S_IDLE_TOP;
+			state <= S_IDCT_MULTIPLY_0;
 			DPRAM_wen1_a <= 1'b0;
+			DPRAM_address0_a <= RESULT_OFFSET;
+			DPRAM_address1_a <= BLOCK_POSITION;
+			DPRAM_address1_b <= BLOCK_POSITION + 1'b1;
+			BLOCK_POSITION <= BLOCK_POSITION + 2'b10;
 			loaded_c_coef <= 1'b1;
+		end
+
+		S_IDCT_MULTIPLY_0: begin
+			DPRAM_address1_a <= BLOCK_POSITION[2:0] + {{BLOCK_POSITION[9:6]}, {3{1'b0}}};
+			DPRAM_address1_b <= BLOCK_POSITION[2:0] + {{BLOCK_POSITION[9:6]}, {3{1'b0}}} + 1'b1;
+			BLOCK_POSITION <= BLOCK_POSITION + 2'b10;
+
+			DPRAM_wen0_a <= 1'b0;
+			
+			if(BLOCK_POSITION >= 6) begin
+				mul0_op1 <= C_COEF[BLOCK_POSITION_ADJ_MUL[2:0]][BLOCK_POSITION_ADJ_MUL[5:3]];
+				mul0_op2 <= DPRAM_read_data1_a;
+
+				mul1_op1 <= C_COEF[BLOCK_POSITION_ADJ_MUL[2:0] + 1'b1][BLOCK_POSITION_ADJ_MUL[5:3]];
+				mul1_op2 <= DPRAM_read_data1_b;
+
+				DPRAM_write_data0_a <= DPRAM_write_data0_a + mul0_result + mul1_result;
+
+				if(BLOCK_POSITION_ADJ_MUL >= 6) begin
+					if(BLOCK_POSITION_ADJ_MUL[2:0] == 3'b010) begin
+
+						DPRAM_address0_a <= RESULT_OFFSET + BLOCK_POSITION_ADJ_MUL[8:3];
+						DPRAM_write_data0_a <= mul0_result + mul1_result;
+					end
+
+					if (BLOCK_POSITION_ADJ_MUL[2:0] == 3'b000) begin
+						DPRAM_wen0_a <= 1'b1;
+					end
+				end
+			end
+
+			if(BLOCK_POSITION > 512) begin
+				state <= S_IDLE_TOP;
+			end
 		end
 
 		S_READ_U_0: begin
