@@ -9,12 +9,29 @@ add wave uut/SRAM_we_n
 add wave -hexadecimal uut/SRAM_write_data
 add wave -hexadecimal uut/SRAM_read_data
 add wave -decimal uut/SRAM_address
+add wave -decimal uut/BLOCK_POSITION
+add wave -decimal uut/BLOCK_POSITION_ADJ
+add wave -decimal uut/C_COEF
+add wave -decimal uut/C_COEF_TRANS
 
-add wave uut/DPRAM_wen
-add wave -hexadecimal uut/DPRAM_write_data
-add wave -decimal uut/DPRAM_write_address
-add wave -hexadecimal uut/DPRAM_read_address
-add wave -decimal uut/DPRAM_read_data
+add wave -divider {RAMS BELOW}
+add wave uut/DPRAM_wen0_a
+add wave uut/DPRAM_wen0_b
+add wave -hexadecimal uut/DPRAM_write_data0_a
+add wave -hexadecimal uut/DPRAM_write_data0_b
+add wave -decimal uut/DPRAM_address0_a
+add wave -decimal uut/DPRAM_address0_b
+add wave -decimal uut/DPRAM_read_data0_a
+add wave -decimal uut/DPRAM_read_data0_b
+
+add wave uut/DPRAM_wen1_a
+add wave uut/DPRAM_wen1_b
+add wave -hexadecimal uut/DPRAM_write_data1_a
+add wave -hexadecimal uut/DPRAM_write_data1_b
+add wave -decimal uut/DPRAM_address1_a
+add wave -decimal uut/DPRAM_address1_b
+add wave -decimal uut/DPRAM_read_data1_a
+add wave -decimal uut/DPRAM_read_data1_b
 
 
 #add wave -hexadecimal uut/data_counter

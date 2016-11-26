@@ -85,9 +85,13 @@ logic [3:0] PB_pushed;
 logic [31:0] X_BLOCK_OFFSET, Y_BLOCK_OFFSET, X_Y_BLOCK_OFFSET;
 logic [31:0] X_BLOCK_INC, Y_BLOCK_INC;
 logic [7:0] BLOCK_POSITION;
+logic [7:0] BLOCK_POSITION_ADJ;
 
-logic [7:0] C_COEF [7:0];
-logic [7:0] C_COEF_TRANS [7:0];
+assign BLOCK_POSITION_ADJ = BLOCK_POSITION - 2'b11;
+
+logic [31:0] C_COEF [7:0] [7:0];
+logic [31:0] C_COEF_TRANS [7:0] [7:0];
+logic loaded_c_coef;
 
 // For VGA
 logic [9:0] VGA_red, VGA_green, VGA_blue;
@@ -108,9 +112,14 @@ assign SRAM_read_high_byte = SRAM_read_data[15:8];
 assign SRAM_read_low_byte = SRAM_read_data[7:0];
 
 //for DP rams
-logic [31:0] DPRAM_write_data, DPRAM_read_data;
-logic [8:0] DPRAM_write_address, DPRAM_read_address;
-logic DPRAM_wen;
+logic [31:0] DPRAM_write_data0_a, DPRAM_write_data0_b, DPRAM_read_data0_a, DPRAM_read_data0_b;
+logic [8:0]  DPRAM_address0_a, DPRAM_address0_b;
+logic DPRAM_wen0_a, DPRAM_wen0_b;
+
+//for DP rams
+logic [31:0] DPRAM_write_data1_a, DPRAM_write_data1_b, DPRAM_read_data1_a, DPRAM_read_data1_b;
+logic [8:0]  DPRAM_address1_a, DPRAM_address1_b;
+logic DPRAM_wen1_a, DPRAM_wen1_b;
 
 // For Colorspace conversion
 logic [31:0] RED, GREEN, BLUE, Y_ODD, Y_EVEN, U_ODD, U_EVEN, V_ODD, V_EVEN, Y_multi_EVEN, U_multi_EVEN, V_multi_EVEN, Y_multi_ODD, U_multi_ODD, V_multi_ODD;
@@ -194,10 +203,21 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		SRAM_write_data <= 16'd0;
 		SRAM_address <= 18'd0;
 
-		DPRAM_wen <= 1'b0;
-		DPRAM_write_data <= 16'b0;
-		DPRAM_write_address <= 9'b0;
-		DPRAM_read_address <= 9'b0;
+		DPRAM_wen0_a <= 1'b0;
+		DPRAM_write_data0_a <= 16'b0;
+		DPRAM_address0_a <= 9'b0;
+
+		DPRAM_wen0_b <= 1'b0;
+		DPRAM_write_data0_b <= 16'b0;
+		DPRAM_address0_b <= 9'b0;
+
+		DPRAM_wen1_a <= 1'b0;
+		DPRAM_write_data1_a <= 16'b0;
+		DPRAM_address1_a <= 9'b0;
+
+		DPRAM_wen1_b <= 1'b0;
+		DPRAM_write_data1_b <= 16'b0;
+		DPRAM_address1_b <= 9'b0;
 
 		X_BLOCK_OFFSET <= 1'b0;
 		Y_BLOCK_OFFSET <= 1'b0;
@@ -205,6 +225,8 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		Y_BLOCK_INC <= 9'd320;
 		X_Y_BLOCK_OFFSET <= 1'b0;
 		BLOCK_POSITION <= 1'b0;
+
+		loaded_c_coef <= 1'b0;
 
 		data_counter <= 18'd0;
 		RED_second_word <= 1'b0;
@@ -241,7 +263,8 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				X_Y_BLOCK_OFFSET <= 0;
 				BLOCK_POSITION <= BLOCK_POSITION + 1'b1;
 				SRAM_address <= IDCT_OFFSET;
-
+				DPRAM_address0_a <= 1'b0;
+				DPRAM_address0_b <= CT_OFFSET;
 				//state <= S_READ_U_0;
 				//SRAM_address <= data_counter[17:1] + U_OFFSET; //for milestone 1
 			end
@@ -251,18 +274,31 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			state <= S_IDCT_LOAD_1;
 			BLOCK_POSITION <= BLOCK_POSITION + 1'b1;
 
+			DPRAM_address0_a <= DPRAM_address0_a + 1'b1;
+			DPRAM_address0_b <= DPRAM_address0_b + 1'b1;
+
 			SRAM_address <= SRAM_address + X_BLOCK_INC;
 		end
 		S_IDCT_LOAD_1: begin
 			state <= S_IDCT_LOAD_WRITE;
 			BLOCK_POSITION <= BLOCK_POSITION + 1'b1;
-			DPRAM_write_address <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b11;
+
+			DPRAM_address0_a <= DPRAM_address0_a + 1'b1;
+			DPRAM_address0_b <= DPRAM_address0_b + 1'b1;
+
+			DPRAM_address1_a <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b11;
 			SRAM_address <= SRAM_address + X_BLOCK_INC;
 		end
 		S_IDCT_LOAD_WRITE: begin
-			DPRAM_write_data <= SRAM_read_data;
-			DPRAM_write_address <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b11;
-			DPRAM_wen <= 1'b1;
+			if(!loaded_c_coef) begin
+				C_COEF[BLOCK_POSITION_ADJ[7:3]][BLOCK_POSITION_ADJ[2:0]] <= DPRAM_read_data0_a;
+		  		C_COEF_TRANS[BLOCK_POSITION_ADJ[7:3]][BLOCK_POSITION_ADJ[2:0]] <= DPRAM_read_data0_b;
+		  		DPRAM_address0_a <= DPRAM_address0_a + 1'b1;
+				DPRAM_address0_b <= DPRAM_address0_b + 1'b1;
+			end
+			DPRAM_write_data1_a <= SRAM_read_data;
+			DPRAM_address1_a <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b11;
+			DPRAM_wen1_a <= 1'b1;
 			if(BLOCK_POSITION == 64) begin
 				state <= S_IDCT_LOAD_FINISH_0;
 			end else begin
@@ -276,20 +312,29 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		end
 
 		S_IDCT_LOAD_FINISH_0: begin
-		state <= S_IDCT_LOAD_FINISH_1;
-			DPRAM_write_data <= SRAM_read_data;
-			DPRAM_write_address <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b10;
+			state <= S_IDCT_LOAD_FINISH_1;
+			DPRAM_write_data1_a <= SRAM_read_data;
+			DPRAM_address1_a <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b10;
+			if(!loaded_c_coef) begin
+				C_COEF[7][6] <= DPRAM_read_data0_a;
+		  		C_COEF_TRANS[7][6] <= DPRAM_read_data0_b;
+			end
 		end
 
 		S_IDCT_LOAD_FINISH_1: begin
 			state <= S_IDCT_LOAD_FINISH_2;
-			DPRAM_write_data <= SRAM_read_data;
-			DPRAM_write_address <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b01;
+			DPRAM_write_data1_a <= SRAM_read_data;
+			DPRAM_address1_a <= LOADED_BLOCK_OFFSET + BLOCK_POSITION - 2'b01;
+			if(!loaded_c_coef) begin
+				C_COEF[7][7] <= DPRAM_read_data0_a;
+		  		C_COEF_TRANS[7][7] <= DPRAM_read_data0_b;
+			end
 		end
 
 		S_IDCT_LOAD_FINISH_2: begin
 			state <= S_IDLE_TOP;
-			DPRAM_wen <= 1'b0;
+			DPRAM_wen1_a <= 1'b0;
+			loaded_c_coef <= 1'b1;
 		end
 
 		S_READ_U_0: begin
@@ -509,14 +554,30 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 	end
 end
 
-dual_port_ram0 ram_inst (
+dual_port_ram0 ram_inst0 (
 	.clock(CLOCK_50_I),
-	.data(DPRAM_write_data),
-	.rdaddress(DPRAM_read_address),
-	.wraddress(DPRAM_write_address),
-	.q(DPRAM_read_data),
-	.wren(DPRAM_wen)
+	.data_a(DPRAM_write_data0_a),
+	.data_b(DPRAM_write_data0_b),
+	.address_a(DPRAM_address0_a),
+	.address_b(DPRAM_address0_b),
+	.q_a(DPRAM_read_data0_a),
+	.q_b(DPRAM_read_data0_b),
+	.wren_a(DPRAM_wen0_a),
+	.wren_b(DPRAM_wen0_b)
 );
+
+dual_port_ram1 ram_inst1 (
+	.clock(CLOCK_50_I),
+	.data_a(DPRAM_write_data1_a),
+	.data_b(DPRAM_write_data1_b),
+	.address_a(DPRAM_address1_a),
+	.address_b(DPRAM_address1_b),
+	.q_a(DPRAM_read_data1_a),
+	.q_b(DPRAM_read_data1_b),
+	.wren_a(DPRAM_wen1_a),
+	.wren_b(DPRAM_wen1_b)
+);
+
 
 // Push Button unit
 PB_Controller PB_unit (

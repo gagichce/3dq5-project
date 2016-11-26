@@ -24,6 +24,7 @@ vlog -sv -svinputport=var -work rtl_work VGA_SRAM_interface.v
 vlog -sv -svinputport=var -work rtl_work UART_SRAM_interface.v
 vlog -sv -svinputport=var -work rtl_work Clock_100_PLL.v
 vlog -sv -svinputport=var -work rtl_work dual_port_ram0.v
+vlog -sv -svinputport=var -work rtl_work dual_port_ram1.v
 vlog -sv -svinputport=var -work rtl_work milestone1_mac.v
 vlog -sv -svinputport=var -work rtl_work milestone1_multiplier.v
 vlog -sv -svinputport=var -work rtl_work clipper.v

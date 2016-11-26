@@ -36,7 +36,7 @@
 // synopsys translate_off
 `timescale 1 ps / 1 ps
 // synopsys translate_on
-module dual_port_ram0 (
+module dual_port_ram1 (
 	address_a,
 	address_b,
 	clock,
@@ -102,7 +102,7 @@ module dual_port_ram0 (
 		altsyncram_component.clock_enable_output_a = "BYPASS",
 		altsyncram_component.clock_enable_output_b = "BYPASS",
 		altsyncram_component.indata_reg_b = "CLOCK0",
-		altsyncram_component.init_file = "dual_port_ram0.mif",
+		altsyncram_component.init_file = "dual_port_ram1.mif",
 		altsyncram_component.init_file_layout = "PORT_A",
 		altsyncram_component.intended_device_family = "Cyclone II",
 		altsyncram_component.lpm_type = "altsyncram",
