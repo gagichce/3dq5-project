@@ -222,6 +222,9 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		SRAM_we_n <= 1'b1;
 		SRAM_write_data <= 16'd0;
 		SRAM_address <= 18'd0;
+		SRAM_writable_result <= 1'b0;
+		SRAM_write_offset <= 1'b0;
+		SRAM_write_row_offset <= 1'b0;
 
 		DPRAM_wen0_a <= 1'b0;
 		DPRAM_write_data0_a <= 16'b0;
@@ -413,6 +416,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			DPRAM_wen0_a <= 1'b0;
 			BLOCK_POSITION <= 1'b0;
 			SRAM_write_data <= 1'b0;
+			SRAM_address <= 1'b0;
 			//DPRAM_address0_a <= RESULT_OFFSET;
 			//DPRAM_address0_b <= RESULT_OFFSET + 4'h8;
 		end
@@ -435,20 +439,36 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				multiplication_sum <= multiplication_sum + mul0_result + mul1_result;
 
 				if(BLOCK_POSITION_ADJ_MUL >= 6) begin
-					if(BLOCK_POSITION_ADJ_MUL[2:0] == 3'b000) begin
+					if(BLOCK_POSITION_ADJ_MUL[2:0] == 3'b010) begin
 
-						SRAM_address <= BLOCK_POSITION_ADJ_MUL[8:3];
+
 						multiplication_sum <= mul0_result + mul1_result;
-					end
 
-					if (BLOCK_POSITION_ADJ_MUL[2:0] == 3'b000) begin
-						//DPRAM_wen0_a <= 1'b1;
+						if(BLOCK_POSITION_ADJ[3]) begin
+							SRAM_writable_result <= {clipped_sum[7:0], {8{1'b0}}};
+						end else begin
+							SRAM_writable_result <= SRAM_writable_result + clipped_sum[7:0];
+
+						end
+					end
+					if (BLOCK_POSITION_ADJ_MUL[3:0] == 4'b1010 && BLOCK_POSITION_ADJ_MUL >= 14) begin
+						SRAM_we_n <= 1'b0;
+						SRAM_write_data <= SRAM_writable_result;
+
+					end
+					if (BLOCK_POSITION_ADJ_MUL[3:0] == 4'b1100 && BLOCK_POSITION_ADJ_MUL >= 10) begin
+						SRAM_address <= SRAM_write_row_offset + BLOCK_POSITION_ADJ_MUL[5:4];
+					end
+					
+					if(BLOCK_POSITION_ADJ_MUL[5:0] == 6'b001010 && BLOCK_POSITION_ADJ_MUL >= 14) begin
+							SRAM_write_row_offset <= SRAM_write_row_offset + 8'hA0; //add 160 to the row offset
 					end
 				end
 			end
 
-			if(BLOCK_POSITION >= 128) begin
+			if(BLOCK_POSITION >= 512) begin
 				state <= S_IDLE_TOP;
+				SRAM_we_n <= 1'b1;
 			end
 		end
 
