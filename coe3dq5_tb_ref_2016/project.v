@@ -466,10 +466,16 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				end
 			end
 
-			if(BLOCK_POSITION >= 512) begin
-				state <= S_IDLE_TOP;
-				SRAM_we_n <= 1'b1;
+			if(BLOCK_POSITION >= 518) begin
+				state <= S_IDCT_FINISH_MULTIPLY_1;
+				SRAM_write_data <= SRAM_writable_result + clipped_sum[7:0];
+				SRAM_we_n <= 1'b0;
 			end
+		end
+
+		S_IDCT_FINISH_MULTIPLY_1: begin
+			SRAM_we_n <= 1'b1;
+			state <= S_IDLE_TOP;
 		end
 
 		S_READ_U_0: begin
