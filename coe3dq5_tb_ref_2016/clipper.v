@@ -18,14 +18,8 @@ always_comb begin
 		clipped <= 1'b0;
 	end else begin
 		clipped <= lower;
-		if(upper == 8'hFF) begin
-			//if(lower >= 8'b11111000) begin
-				clipped <= 0;
-			//end
-		end else if (upper == 8'h01) begin
-			//if(lower <= 8'd8) begin
-				clipped <= 8'hFF;
-			//end
+		if(upper) begin
+			clipped <= upper[7] ? 8'h00 : 8'hff;
 		end
 	end
 end

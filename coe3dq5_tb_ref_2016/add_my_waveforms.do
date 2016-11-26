@@ -9,11 +9,18 @@ add wave uut/SRAM_we_n
 add wave -hexadecimal uut/SRAM_write_data
 add wave -hexadecimal uut/SRAM_read_data
 add wave -decimal uut/SRAM_address
+
+add wave -hexadecimal uut/SRAM_writable_result
+add wave -hexadecimal uut/SRAM_write_offset
+add wave -hexadecimal uut/SRAM_write_row_offset
+
 add wave -decimal uut/BLOCK_POSITION
 add wave -decimal uut/BLOCK_POSITION_ADJ
 add wave -decimal uut/BLOCK_POSITION_ADJ_MUL
-add wave -decimal uut/C_COEF
-add wave -decimal uut/C_COEF_TRANS
+#add wave -decimal uut/C_COEF
+#add wave -decimal uut/C_COEF_TRANS
+add wave -decimal uut/multiplication_sum
+add wave -hexadecimal uut/clipped_sum
 
 add wave -divider {RAMS BELOW}
 add wave uut/DPRAM_wen0_a
@@ -58,6 +65,9 @@ add wave -decimal uut/tester
 add wave -decimal uut/tester2
 add wave -decimal uut/mul0_result
 add wave -decimal uut/mul1_result
+
+add wave -decimal uut/mul0_op1
+add wave -decimal uut/mul1_op1
 
 add wave -decimal uut/DPRAM_write_data0_a
 

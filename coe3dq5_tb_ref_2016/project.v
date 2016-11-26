@@ -94,10 +94,18 @@ assign BLOCK_POSITION_ADJ_MUL = BLOCK_POSITION - 3'b110;
 logic [31:0] C_COEF [7:0] [7:0];
 logic [31:0] C_COEF_TRANS [7:0] [7:0];
 
+logic [15:0] SRAM_writable_result;
+
+logic [17:0] SRAM_write_offset;
+logic [17:0] SRAM_write_row_offset;
+
+
+logic [31:0] multiplication_sum;
+logic [15:0] clipped_sum;
+
 logic [31:0] tester, tester2;
 
-assign tester = C_COEF[BLOCK_POSITION_ADJ_MUL[2:0]][BLOCK_POSITION_ADJ_MUL[5:3]];
-assign tester2 = C_COEF[BLOCK_POSITION_ADJ_MUL[2:0] + 1'b1][BLOCK_POSITION_ADJ_MUL[5:3]];
+
 
 logic loaded_c_coef;
 
@@ -128,6 +136,9 @@ logic DPRAM_wen0_a, DPRAM_wen0_b;
 logic [31:0] DPRAM_write_data1_a, DPRAM_write_data1_b, DPRAM_read_data1_a, DPRAM_read_data1_b;
 logic [8:0]  DPRAM_address1_a, DPRAM_address1_b;
 logic DPRAM_wen1_a, DPRAM_wen1_b;
+
+assign tester = {{8{DPRAM_read_data0_a[31]}},DPRAM_read_data0_a[31:8]}; 
+assign tester2 = {{8{DPRAM_read_data0_b[31]}},DPRAM_read_data0_b[31:8]}; 
 
 // For Colorspace conversion
 logic [31:0] RED, GREEN, BLUE, Y_ODD, Y_EVEN, U_ODD, U_EVEN, V_ODD, V_EVEN, Y_multi_EVEN, U_multi_EVEN, V_multi_EVEN, Y_multi_ODD, U_multi_ODD, V_multi_ODD;
@@ -202,6 +213,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		rect_col_count <= 3'd0;
 		rect_width_count <= 6'd0;
 		rect_height_count <= 5'd0;
+		multiplication_sum <= 1'b0;
 		
 		VGA_red <= 10'd0;
 		VGA_green <= 10'd0;
@@ -392,12 +404,52 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 			if(BLOCK_POSITION > 516) begin
 				state <= S_IDCT_FINISH_MULTIPLY_0;
+
 			end
 		end
 
 		S_IDCT_FINISH_MULTIPLY_0: begin
-			state <= S_IDLE_TOP;
+			state <= S_IDCT_MULTIPLY_1;
 			DPRAM_wen0_a <= 1'b0;
+			BLOCK_POSITION <= 1'b0;
+			SRAM_write_data <= 1'b0;
+			//DPRAM_address0_a <= RESULT_OFFSET;
+			//DPRAM_address0_b <= RESULT_OFFSET + 4'h8;
+		end
+		
+		S_IDCT_MULTIPLY_1: begin
+
+			DPRAM_address0_a <= RESULT_OFFSET + BLOCK_POSITION[5:3] + {{BLOCK_POSITION[2:0]}, {3{1'b0}}};
+			DPRAM_address0_b <= RESULT_OFFSET + BLOCK_POSITION[5:3] + {{BLOCK_POSITION[2:0]}, {3{1'b0}}} + 4'h8;
+			BLOCK_POSITION <= BLOCK_POSITION + 2'b10;
+
+			SRAM_we_n <= 1'b1;
+
+			if(BLOCK_POSITION >= 6) begin
+				mul0_op1 <= C_COEF[BLOCK_POSITION_ADJ_MUL[2:0]][BLOCK_POSITION_ADJ_MUL[9:6]];
+				mul0_op2 <= {{8{DPRAM_read_data0_a[31]}},DPRAM_read_data0_a[31:8]}; //divide by 256
+
+				mul1_op1 <= C_COEF[BLOCK_POSITION_ADJ_MUL[2:0] + 1'b1][BLOCK_POSITION_ADJ_MUL[9:6]];
+				mul1_op2 <= {{8{DPRAM_read_data0_b[31]}},DPRAM_read_data0_b[31:8]}; //divide by 256
+
+				multiplication_sum <= multiplication_sum + mul0_result + mul1_result;
+
+				if(BLOCK_POSITION_ADJ_MUL >= 6) begin
+					if(BLOCK_POSITION_ADJ_MUL[2:0] == 3'b000) begin
+
+						SRAM_address <= BLOCK_POSITION_ADJ_MUL[8:3];
+						multiplication_sum <= mul0_result + mul1_result;
+					end
+
+					if (BLOCK_POSITION_ADJ_MUL[2:0] == 3'b000) begin
+						//DPRAM_wen0_a <= 1'b1;
+					end
+				end
+			end
+
+			if(BLOCK_POSITION >= 128) begin
+				state <= S_IDLE_TOP;
+			end
 		end
 
 		S_READ_U_0: begin
@@ -678,6 +730,12 @@ clipper clipper_b_odd(
 	.Resetn(resetn),
 	.value(B_result_ODD[31:16]),
 	.clipped(B_writable_odd)
+);
+
+clipper clipper_multiplication(
+	.Resetn(resetn),
+	.value(multiplication_sum[31:16]),
+	.clipped(clipped_sum)
 );
 
 // SRAM unit
