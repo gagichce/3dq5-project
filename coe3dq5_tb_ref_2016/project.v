@@ -539,7 +539,10 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 					if(SRAM_read_row_offset >= 18'd152320) begin
 						done_u <= 1'b1;
-						state <= S_IDLE_TOP;
+						done_v <= 1'b1;
+						//state <= S_IDLE_TOP;
+						state <= S_READ_U_0;
+						SRAM_address <= data_counter[17:1] + U_OFFSET; //for milestone 1
 					end
 				end
 			end

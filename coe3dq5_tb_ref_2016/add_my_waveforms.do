@@ -22,10 +22,10 @@ add wave -decimal uut/done_y
 add wave -decimal uut/done_u
 add wave -decimal uut/done_v
 
-add wave -decimal uut/BLOCK_POSITION
-add wave -decimal uut/BLOCK_POSITION_ADJ
-add wave -decimal uut/BLOCK_POSITION_ADJ_MUL
-add wave -decimal uut/C_COEF
+#add wave -decimal uut/BLOCK_POSITION
+#add wave -decimal uut/BLOCK_POSITION_ADJ
+#add wave -decimal uut/BLOCK_POSITION_ADJ_MUL
+#add wave -decimal uut/C_COEF
 #add wave -decimal uut/C_COEF_TRANS
 add wave -decimal uut/multiplication_sum
 add wave -hexadecimal uut/clipped_sum

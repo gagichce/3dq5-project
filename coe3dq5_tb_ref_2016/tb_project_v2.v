@@ -35,7 +35,7 @@ you will get false errors, so use the original testbench instead.
 
 // file for comparison
 // to test milestone 2 independently, use the .sram_d1 file to check the output
-`define VERIFICATION_FILE_NAME "motorcycle.sram_d1"
+`define VERIFICATION_FILE_NAME "motorcycle.sram_d0"
 
 //// for milestone 1
 //`define INPUT_FILE_NAME "motorcycle.sram_d1"
@@ -309,7 +309,7 @@ always @ (posedge Clock_50) begin
 	if (uut.SRAM_we_n == 1'b0) begin	//signal names within project (instantiated as uut) should match here, assuming names from experiment4a
 	
 		//IMPORTANT: this is the "no write" memory region for milestone 1, change region for different milestones
-		if (uut.SRAM_address > 76800) begin
+		if (uut.SRAM_address > 76800 && uut.SRAM_address < 146944) begin
 			if (warn_writing_out_of_region < `MAX_MISMATCHES) begin
 				$write("critical warning: writing outside of the YUV data region, may corrupt source data in SRAM\n");
 				$write("  writing value %d (%x hex) to location %d (%x hex), sim time %t\n", 
