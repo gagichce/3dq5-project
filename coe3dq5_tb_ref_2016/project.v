@@ -96,8 +96,13 @@ logic [31:0] C_COEF_TRANS [7:0] [7:0];
 
 logic [15:0] SRAM_writable_result;
 
+logic [17:0] SRAM_read_col_offset;
+logic [17:0] SRAM_read_row_offset;
+
 logic [17:0] SRAM_write_offset;
 logic [17:0] SRAM_write_row_offset;
+logic [17:0] SRAM_write_block_row_offset;
+logic [17:0] SRAM_write_col_offset;
 
 
 logic [31:0] multiplication_sum;
@@ -225,6 +230,10 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		SRAM_writable_result <= 1'b0;
 		SRAM_write_offset <= 1'b0;
 		SRAM_write_row_offset <= 1'b0;
+		SRAM_read_col_offset <= 1'b0;
+		SRAM_read_row_offset <= 1'b0;
+		SRAM_write_col_offset <= 1'b0;
+		SRAM_write_block_row_offset <= 1'b0;
 
 		DPRAM_wen0_a <= 1'b0;
 		DPRAM_write_data0_a <= 16'b0;
@@ -441,7 +450,6 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				if(BLOCK_POSITION_ADJ_MUL >= 6) begin
 					if(BLOCK_POSITION_ADJ_MUL[2:0] == 3'b010) begin
 
-
 						multiplication_sum <= mul0_result + mul1_result;
 
 						if(BLOCK_POSITION_ADJ[3]) begin
@@ -457,11 +465,11 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 					end
 					if (BLOCK_POSITION_ADJ_MUL[3:0] == 4'b1100 && BLOCK_POSITION_ADJ_MUL >= 10) begin
-						SRAM_address <= SRAM_write_row_offset + BLOCK_POSITION_ADJ_MUL[5:4];
+						SRAM_address <= SRAM_write_col_offset + SRAM_write_row_offset + SRAM_write_block_row_offset + BLOCK_POSITION_ADJ_MUL[5:4];
 					end
 					
 					if(BLOCK_POSITION_ADJ_MUL[5:0] == 6'b001010 && BLOCK_POSITION_ADJ_MUL >= 14) begin
-							SRAM_write_row_offset <= SRAM_write_row_offset + 8'hA0; //add 160 to the row offset
+							SRAM_write_block_row_offset <= SRAM_write_block_row_offset + 8'hA0; //add 160 to the row offset
 					end
 				end
 			end
@@ -469,14 +477,45 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			if(BLOCK_POSITION >= 518) begin
 				state <= S_IDCT_FINISH_MULTIPLY_1;
 				SRAM_write_data <= SRAM_writable_result + clipped_sum[7:0];
+				SRAM_write_block_row_offset <= 1'b0;
 				SRAM_we_n <= 1'b0;
+				mul0_op1 <= 1'b0;
+				mul1_op1 <= 1'b0;
+				multiplication_sum <= 1'b0;
 			end
 		end
 
 		S_IDCT_FINISH_MULTIPLY_1: begin
 			SRAM_we_n <= 1'b1;
-			state <= S_IDLE_TOP;
+			state <= S_IDCT_PROC_NEXT_BLOCK;
+			BLOCK_POSITION <= 1'b0;
 		end
+
+		S_IDCT_PROC_NEXT_BLOCK: begin
+			state <= S_IDCT_LOAD_0;
+			BLOCK_POSITION <= 1'b1;
+			SRAM_read_col_offset <= SRAM_read_col_offset + 4'h8;
+			SRAM_write_col_offset <= SRAM_write_col_offset + 4'h4; 
+
+			SRAM_address <= IDCT_OFFSET + SRAM_read_row_offset + SRAM_read_col_offset + 4'h8;
+			
+			if(SRAM_read_col_offset >= 312) begin //at the end of a row
+				SRAM_read_col_offset <= 1'b0;
+
+				SRAM_read_row_offset <= SRAM_read_row_offset + 13'd2560;
+
+				SRAM_write_col_offset <= 1'b0;
+				SRAM_write_row_offset <= SRAM_write_row_offset + 13'd1280;
+
+				SRAM_address <= IDCT_OFFSET + SRAM_read_row_offset + 13'd2560;
+
+				if(SRAM_read_row_offset >= 16'd44840) state <= S_IDLE_TOP;
+			end
+
+			DPRAM_address0_a <= 1'b0;
+			DPRAM_address0_b <= CT_OFFSET;
+		end
+
 
 		S_READ_U_0: begin
 			state <= S_READ_U_1;
@@ -758,9 +797,9 @@ clipper clipper_b_odd(
 	.clipped(B_writable_odd)
 );
 
-clipper clipper_multiplication(
+clipper_rounding clipper_multiplication(
 	.Resetn(resetn),
-	.value(multiplication_sum[31:16]),
+	.value(multiplication_sum),
 	.clipped(clipped_sum)
 );
 

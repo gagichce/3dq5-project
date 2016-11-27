@@ -25,3 +25,29 @@ always_comb begin
 end
 
 endmodule
+
+module clipper_rounding (
+	input logic Resetn,
+	
+	input logic [31:0] value,
+	output logic [7:0] clipped
+
+);
+
+logic [7:0] upper, lower;
+
+assign upper = value [31:24];
+assign lower = value [23:16];
+
+always_comb begin
+	if(Resetn == 1'b0) begin
+		clipped <= 1'b0;
+	end else begin
+		clipped <= lower ;//+ (value[15:0] >= 16'h7f ? 1'b1 : 1'b0);
+		if(upper) begin
+			clipped <= upper[7] ? 8'h00 : 8'hff;
+		end
+	end
+end
+
+endmodule

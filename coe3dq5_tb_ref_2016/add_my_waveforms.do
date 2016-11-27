@@ -14,10 +14,15 @@ add wave -hexadecimal uut/SRAM_writable_result
 add wave -hexadecimal uut/SRAM_write_offset
 add wave -hexadecimal uut/SRAM_write_row_offset
 
+add wave -decimal uut/SRAM_read_col_offset
+add wave -decimal uut/SRAM_read_row_offset
+add wave -decimal uut/SRAM_write_col_offset
+add wave -decimal uut/SRAM_write_row_offset
+
 add wave -decimal uut/BLOCK_POSITION
 add wave -decimal uut/BLOCK_POSITION_ADJ
 add wave -decimal uut/BLOCK_POSITION_ADJ_MUL
-#add wave -decimal uut/C_COEF
+add wave -decimal uut/C_COEF
 #add wave -decimal uut/C_COEF_TRANS
 add wave -decimal uut/multiplication_sum
 add wave -hexadecimal uut/clipped_sum
@@ -67,7 +72,9 @@ add wave -decimal uut/mul0_result
 add wave -decimal uut/mul1_result
 
 add wave -decimal uut/mul0_op1
+add wave -decimal uut/mul0_op2
 add wave -decimal uut/mul1_op1
+add wave -decimal uut/mul1_op2
 
 add wave -decimal uut/DPRAM_write_data0_a
 

@@ -27,7 +27,7 @@ you will get false errors, so use the original testbench instead.
 // This is the top testbench file
 
 `define FEOF 32'hFFFFFFFF
-`define MAX_MISMATCHES 10
+`define MAX_MISMATCHES 16
 
 // file for output
 // this is only useful if decoding is done all the way through (e.g. milestone 1 is used)
@@ -309,9 +309,9 @@ always @ (posedge Clock_50) begin
 	if (uut.SRAM_we_n == 1'b0) begin	//signal names within project (instantiated as uut) should match here, assuming names from experiment4a
 	
 		//IMPORTANT: this is the "no write" memory region for milestone 1, change region for different milestones
-		if (uut.SRAM_address < 230400) begin
+		if (uut.SRAM_address > 38400) begin
 			if (warn_writing_out_of_region < `MAX_MISMATCHES) begin
-				$write("critical warning: writing outside of the RGB data region, may corrupt source data in SRAM\n");
+				$write("critical warning: writing outside of the YUV data region, may corrupt source data in SRAM\n");
 				$write("  writing value %d (%x hex) to location %d (%x hex), sim time %t\n", 
 					uut.SRAM_write_data, uut.SRAM_write_data, uut.SRAM_address, uut.SRAM_address, $realtime);
 				warn_writing_out_of_region = warn_writing_out_of_region + 1;
