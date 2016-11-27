@@ -84,15 +84,17 @@ logic [3:0] PB_pushed;
 
 logic [31:0] X_BLOCK_OFFSET, Y_BLOCK_OFFSET, X_Y_BLOCK_OFFSET;
 logic [31:0] X_BLOCK_INC, Y_BLOCK_INC;
-logic [9:0] BLOCK_POSITION;
-logic [9:0] BLOCK_POSITION_ADJ;
-logic [9:0] BLOCK_POSITION_ADJ_MUL;
+logic [10:0] BLOCK_POSITION;
+logic [10:0] BLOCK_POSITION_ADJ;
+logic [10:0] BLOCK_POSITION_ADJ_MUL;
 
 assign BLOCK_POSITION_ADJ = BLOCK_POSITION - 2'b11;
 assign BLOCK_POSITION_ADJ_MUL = BLOCK_POSITION - 3'b110;
 
 logic [31:0] C_COEF [7:0] [7:0];
 logic [31:0] C_COEF_TRANS [7:0] [7:0];
+
+logic done_y, done_u, done_v;
 
 logic [15:0] SRAM_writable_result;
 
@@ -258,6 +260,10 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		X_Y_BLOCK_OFFSET <= 1'b0;
 		BLOCK_POSITION <= 1'b0;
 
+		done_y <= 1'b0;
+		done_u <= 1'b0;
+		done_v <= 1'b0;
+
 		loaded_c_coef <= 1'b0;
 
 		data_counter <= 18'd0;
@@ -414,7 +420,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				end
 			end
 
-			if(BLOCK_POSITION > 516) begin
+			if(BLOCK_POSITION >= 520) begin
 				state <= S_IDCT_FINISH_MULTIPLY_0;
 
 			end
@@ -469,12 +475,16 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 					end
 					
 					if(BLOCK_POSITION_ADJ_MUL[5:0] == 6'b001010 && BLOCK_POSITION_ADJ_MUL >= 14) begin
+						if(~done_y) begin
 							SRAM_write_block_row_offset <= SRAM_write_block_row_offset + 8'hA0; //add 160 to the row offset
+						end else begin
+							SRAM_write_block_row_offset <= SRAM_write_block_row_offset + 8'h50; //add 80 to the row offset
+						end
 					end
 				end
 			end
 
-			if(BLOCK_POSITION >= 518) begin
+			if(BLOCK_POSITION >= 520) begin
 				state <= S_IDCT_FINISH_MULTIPLY_1;
 				SRAM_write_data <= SRAM_writable_result + clipped_sum[7:0];
 				SRAM_write_block_row_offset <= 1'b0;
@@ -499,17 +509,39 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 
 			SRAM_address <= IDCT_OFFSET + SRAM_read_row_offset + SRAM_read_col_offset + 4'h8;
 			
-			if(SRAM_read_col_offset >= 312) begin //at the end of a row
-				SRAM_read_col_offset <= 1'b0;
+			if(~done_y) begin
+				if(SRAM_read_col_offset >= 312) begin //at the end of a row
+					SRAM_read_col_offset <= 1'b0;
 
-				SRAM_read_row_offset <= SRAM_read_row_offset + 13'd2560;
+					SRAM_read_row_offset <= SRAM_read_row_offset + 13'd2560;
 
-				SRAM_write_col_offset <= 1'b0;
-				SRAM_write_row_offset <= SRAM_write_row_offset + 13'd1280;
+					SRAM_write_col_offset <= 1'b0;
+					SRAM_write_row_offset <= SRAM_write_row_offset + 13'd1280;
 
-				SRAM_address <= IDCT_OFFSET + SRAM_read_row_offset + 13'd2560;
+					SRAM_address <= IDCT_OFFSET + SRAM_read_row_offset + 13'd2560;
 
-				if(SRAM_read_row_offset >= 16'd44840) state <= S_IDLE_TOP;
+					if(SRAM_read_row_offset >= 18'd74240) begin
+						done_y <= 1'b1;
+						Y_BLOCK_INC <= 9'd160;
+						//state <= S_IDLE_TOP;
+					end
+				end
+			end else if (~done_u) begin
+				if(SRAM_read_col_offset >= 152) begin //at the end of a row
+					SRAM_read_col_offset <= 1'b0;
+
+					SRAM_read_row_offset <= SRAM_read_row_offset + 13'd1280;
+
+					SRAM_write_col_offset <= 1'b0;
+					SRAM_write_row_offset <= SRAM_write_row_offset + 13'd640;
+
+					SRAM_address <= IDCT_OFFSET + SRAM_read_row_offset + 13'd1280;
+
+					if(SRAM_read_row_offset >= 18'd152320) begin
+						done_u <= 1'b1;
+						state <= S_IDLE_TOP;
+					end
+				end
 			end
 
 			DPRAM_address0_a <= 1'b0;

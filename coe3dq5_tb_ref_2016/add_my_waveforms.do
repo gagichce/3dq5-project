@@ -8,7 +8,7 @@ add wave uut/state
 add wave uut/SRAM_we_n
 add wave -hexadecimal uut/SRAM_write_data
 add wave -hexadecimal uut/SRAM_read_data
-add wave -decimal uut/SRAM_address
+add wave uut/SRAM_address
 
 add wave -hexadecimal uut/SRAM_writable_result
 add wave -hexadecimal uut/SRAM_write_offset
@@ -18,6 +18,9 @@ add wave -decimal uut/SRAM_read_col_offset
 add wave -decimal uut/SRAM_read_row_offset
 add wave -decimal uut/SRAM_write_col_offset
 add wave -decimal uut/SRAM_write_row_offset
+add wave -decimal uut/done_y
+add wave -decimal uut/done_u
+add wave -decimal uut/done_v
 
 add wave -decimal uut/BLOCK_POSITION
 add wave -decimal uut/BLOCK_POSITION_ADJ
@@ -38,14 +41,14 @@ add wave -decimal uut/DPRAM_address0_b
 add wave -decimal uut/DPRAM_read_data0_a
 add wave -decimal uut/DPRAM_read_data0_b
 
-add wave uut/DPRAM_wen1_a
-add wave uut/DPRAM_wen1_b
-add wave -hexadecimal uut/DPRAM_write_data1_a
-add wave -hexadecimal uut/DPRAM_write_data1_b
-add wave -decimal uut/DPRAM_address1_a
-add wave -decimal uut/DPRAM_address1_b
-add wave -hexadecimal uut/DPRAM_read_data1_a
-add wave -hexadecimal uut/DPRAM_read_data1_b
+#add wave uut/DPRAM_wen1_a
+#add wave uut/DPRAM_wen1_b
+#add wave -hexadecimal uut/DPRAM_write_data1_a
+#add wave -hexadecimal uut/DPRAM_write_data1_b
+#add wave -decimal uut/DPRAM_address1_a
+#add wave -decimal uut/DPRAM_address1_b
+#add wave -hexadecimal uut/DPRAM_read_data1_a
+#add wave -hexadecimal uut/DPRAM_read_data1_b
 
 
 #add wave -hexadecimal uut/data_counter
@@ -71,10 +74,10 @@ add wave -decimal uut/tester2
 add wave -decimal uut/mul0_result
 add wave -decimal uut/mul1_result
 
-add wave -decimal uut/mul0_op1
-add wave -decimal uut/mul0_op2
-add wave -decimal uut/mul1_op1
-add wave -decimal uut/mul1_op2
+#add wave -decimal uut/mul0_op1
+#add wave -decimal uut/mul0_op2
+#add wave -decimal uut/mul1_op1
+#add wave -decimal uut/mul1_op2
 
 add wave -decimal uut/DPRAM_write_data0_a
 
