@@ -1,0 +1,9 @@
+-- MIF for RAM of size 512 x 32
+
+WIDTH = 32;
+DEPTH = 512;
+ADDRESS_RADIX = UNS;
+DATA_RADIX = HEX;
+CONTENT BEGIN
+	[0..511]  :   0;
+END
